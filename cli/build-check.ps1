@@ -176,7 +176,16 @@ if ($Build) {
   Section 'Configure (build-cuda)'
   $cudaRoot = $env:CUDA_PATH -replace '\\', '/'   # forward slashes: a backslash in a -D value is an escape to CMake
   $log = Join-Path $Root 'build-cuda-check.log'
-  $cfg = @('-S', $Root, '-B', (Join-Path $Root 'build-cuda'), '-G', 'Visual Studio 17 2022', '-A', 'x64', '-DGGML_CUDA=ON', "-DCUDAToolkit_ROOT=$cudaRoot")
+  # Visual Studio's CUDA integration (CUDA 13.x.props) finds nvcc through CUDA_PATH_V13_x, which the installer sets
+  # machine-wide: a terminal (or CI step) opened before the install has only what it was given, and CMake then reports
+  # "Looking for a CUDA compiler - NOTFOUND" (seen on GitHub's runner). Set it for the children if it is missing, and
+  # name the toolkit explicitly with the generator's toolset (-T cuda=<path>) so nothing depends on it.
+  if ($cudaVer) {
+    $vvar = "CUDA_PATH_V{0}_{1}" -f $cudaVer.Major, $cudaVer.Minor
+    if (-not [Environment]::GetEnvironmentVariable($vvar)) { [Environment]::SetEnvironmentVariable($vvar, $env:CUDA_PATH) }
+  }
+  $cfg = @('-S', $Root, '-B', (Join-Path $Root 'build-cuda'), '-G', 'Visual Studio 17 2022', '-A', 'x64', '-T', "cuda=$cudaRoot",
+           '-DGGML_CUDA=ON', "-DCUDAToolkit_ROOT=$cudaRoot")
   if ($Arch) { $cfg += "-DCMAKE_CUDA_ARCHITECTURES=$Arch" }
   & $cmake @cfg 2>&1 | ForEach-Object { "$_" } | Out-File -FilePath $log -Encoding utf8
   if ($LASTEXITCODE -ne 0) { Fail "configure failed - see $log"; Get-Content $log -Tail 25; exit 1 }

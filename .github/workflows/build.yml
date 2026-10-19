@@ -33,7 +33,9 @@ jobs:
           $cuda = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3'
           if (-not (Test-Path "$cuda\bin\nvcc.exe")) { throw "CUDA install failed (installer exit $($p.ExitCode)): no nvcc.exe" }
           & "$cuda\bin\nvcc.exe" --version
+          # the installer sets these machine-wide; later steps only see what is written to GITHUB_ENV
           "CUDA_PATH=$cuda" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "CUDA_PATH_V13_3=$cuda" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "$cuda\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
       - name: Prerequisites, configure, build, unit tests
