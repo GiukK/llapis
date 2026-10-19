@@ -1,0 +1,49 @@
+# Build check on a clean Windows machine: does LLapis still configure, build and pass its unit tests
+# with nothing but Visual Studio 2022 and the CUDA 13.3 toolkit? It runs the same build-check.cmd
+# the README points users to. GitHub's runners have no GPU, so the CUDA code is compiled for an
+# explicit architecture (86 = RTX 30) and nothing is run on a GPU: that is the job of a real machine.
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-cuda:
+    runs-on: windows-2022
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install CUDA Toolkit 13.3 (NVIDIA network installer, silent)
+        shell: pwsh
+        run: |
+          $url = 'https://developer.download.nvidia.com/compute/cuda/13.3.0/network_installers/cuda_13.3.0_windows_network.exe'
+          Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\cuda.exe"
+          $p = Start-Process -FilePath "$env:RUNNER_TEMP\cuda.exe" -ArgumentList '-s' -Wait -PassThru
+          $cuda = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3'
+          if (-not (Test-Path "$cuda\bin\nvcc.exe")) { throw "CUDA install failed (installer exit $($p.ExitCode)): no nvcc.exe" }
+          & "$cuda\bin\nvcc.exe" --version
+          "CUDA_PATH=$cuda" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "$cuda\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Prerequisites, configure, build, unit tests
+        shell: cmd
+        run: build-check.cmd -NoGpu -Build -Arch 86-real
+
+      - name: Upload the build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build-cuda-check.log
+          if-no-files-found: ignore

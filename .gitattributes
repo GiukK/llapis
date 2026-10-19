@@ -1,0 +1,43 @@
+# Fine riga deterministici.
+#
+# Non e' cosmesi. Il bundle UI e' fatto di JS/CSS minificati, immagini, e QUATTRO file
+# con estensione .json di cui due sono stream gzip: una sola conversione CRLF li
+# corrompe. Fino al 2026-08-10 la protezione era `ui-dist/** -text`; con F1 il bundle
+# si e' spostato in third_party/llama/tools/ui/dist e la regola lo ha seguito. Se un
+# giorno si sposta ancora, questa riga deve muoversi con lui, o il prodotto serve un
+# bundle rotto e nessun test se ne accorge.
+#
+# ORDINE: in gitattributes NON vince la regola piu' specifica, vince l'ULTIMA che
+# corrisponde. I blocchi sono quindi disposti dal piu' generico al piu' vincolante, e
+# il bundle sta in fondo. Invertendoli, `*.json text eol=lf` scavalcherebbe il blocco
+# del bundle e i quattro .json tornerebbero a essere convertiti al checkout.
+
+# Default: normalizza in repo, LF nel working tree su ogni piattaforma.
+# `text=auto` rileva i binari da solo, quindi png/woff2/ico dell'albero assorbito
+# non hanno bisogno di una riga propria -- solo le estensioni forzate a testo qui
+# sotto possono fare danno, ed e' per questo che il blocco finale esiste.
+*                      text=auto eol=lf
+
+# --- sorgenti ---------------------------------------------------------------
+*.ps1                  text eol=lf
+*.cmd                  text eol=crlf
+*.cpp                  text eol=lf
+*.hpp                  text eol=lf
+*.h                    text eol=lf
+*.cu                   text eol=lf
+*.cuh                  text eol=lf
+*.md                   text eol=lf
+*.txt                  text eol=lf
+*.json                 text eol=lf
+CMakeLists.txt         text eol=lf
+
+# --- provenance/: sorgente del bundle UI, NON un payload -------------------
+# Nessuno script lo applica, ma la sua patch deve restare applicabile con `git apply`
+# su qualunque macchina: LF, e i .png intatti.
+provenance/*.patch           text eol=lf
+provenance/new-files/**/*.png    -text
+provenance/new-files/**/*.svelte text eol=lf
+
+# --- il bundle UI precompilato: MAI toccato -------------------------------
+# Ultimo blocco del file: nessuna regola per estensione puo' piu' scavalcarlo.
+third_party/llama/tools/ui/dist/**   -text

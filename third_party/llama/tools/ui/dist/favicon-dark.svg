@@ -1,0 +1,13 @@
+<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><g transform="translate(2 2) scale(0.96)">
+    <defs>
+        <linearGradient id="llapisLogoGrad" x1="10" y1="10" x2="90" y2="90" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#182b8f"/>
+            <stop offset="100%" stop-color="#3f9dff"/>
+        </linearGradient>
+    </defs>
+    <path d="M18 10H74L90 26V82C90 86.4183 86.4183 90 82 90H18C13.5817 90 10 86.4183 10 82V18C10 13.5817 13.5817 10 18 10Z" fill="url(#llapisLogoGrad)"/>
+    <rect x="32" y="29" width="7" height="34" rx="3.5" fill="#ffffff"/>
+    <rect x="44" y="50" width="11" height="13" rx="5.5" fill="#b9c9fb"/>
+    <rect x="60" y="29" width="7" height="34" rx="3.5" fill="#ffffff"/>
+    <rect x="72" y="50" width="11" height="13" rx="5.5" fill="#b9c9fb"/>
+</g></svg>

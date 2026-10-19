@@ -1,0 +1,721 @@
+diff --git a/tools/ui/src/app.css b/tools/ui/src/app.css
+index 8c4056477dbf3fa070e3a09102d2f226e738469a..8efd9bbcc1ef272309159894988e0885996c688d 100644
+--- a/tools/ui/src/app.css
++++ b/tools/ui/src/app.css
+@@ -61,39 +61,39 @@
+ }
+ 
+ .dark {
+-	--background: oklch(0.16 0 0);
+-	--foreground: oklch(0.985 0 0);
+-	--card: oklch(0.205 0 0);
+-	--card-foreground: oklch(0.985 0 0);
+-	--popover: oklch(0.205 0 0);
+-	--popover-foreground: oklch(0.985 0 0);
+-	--primary: oklch(0.922 0 0);
+-	--primary-foreground: oklch(0.205 0 0);
+-	--secondary: oklch(0.29 0 0);
+-	--secondary-foreground: oklch(0.985 0 0);
+-	--muted: oklch(0.269 0 0);
+-	--muted-foreground: oklch(0.708 0 0);
+-	--accent: oklch(0.269 0 0);
+-	--accent-foreground: oklch(0.985 0 0);
++	--background: #0a0e1b;
++	--foreground: #eef1f8;
++	--card: #131a2c;
++	--card-foreground: #eef1f8;
++	--popover: #131a2c;
++	--popover-foreground: #eef1f8;
++	--primary: #3f7dfb;
++	--primary-foreground: #ffffff;
++	--secondary: #1b2338;
++	--secondary-foreground: #eef1f8;
++	--muted: #171e32;
++	--muted-foreground: #8992ac;
++	--accent: #1b2338;
++	--accent-foreground: #eef1f8;
+ 	--destructive: oklch(0.704 0.191 22.216);
+-	--border: oklch(1 0 0 / 30%);
+-	--input: oklch(1 0 0 / 30%);
+-	--ring: oklch(0.556 0 0);
++	--border: rgba(255, 255, 255, 0.08);
++	--input: rgba(255, 255, 255, 0.1);
++	--ring: #3f7dfb;
+ 	--chart-1: oklch(0.488 0.243 264.376);
+ 	--chart-2: oklch(0.696 0.17 162.48);
+ 	--chart-3: oklch(0.769 0.188 70.08);
+ 	--chart-4: oklch(0.627 0.265 303.9);
+ 	--chart-5: oklch(0.645 0.246 16.439);
+-	--sidebar: oklch(0.2 0 0);
+-	--sidebar-foreground: oklch(0.985 0 0);
+-	--sidebar-primary: oklch(0.488 0.243 264.376);
+-	--sidebar-primary-foreground: oklch(0.985 0 0);
+-	--sidebar-accent: oklch(0.269 0 0);
+-	--sidebar-accent-foreground: oklch(0.985 0 0);
+-	--sidebar-border: oklch(1 0 0 / 10%);
+-	--sidebar-ring: oklch(0.556 0 0);
+-	--code-background: oklch(0.225 0 0);
+-	--code-foreground: oklch(0.875 0 0);
++	--sidebar: #0a0e1b;
++	--sidebar-foreground: #eef1f8;
++	--sidebar-primary: #3f7dfb;
++	--sidebar-primary-foreground: #ffffff;
++	--sidebar-accent: #171e32;
++	--sidebar-accent-foreground: #eef1f8;
++	--sidebar-border: rgba(255, 255, 255, 0.08);
++	--sidebar-ring: #3f7dfb;
++	--code-background: #0f1526;
++	--code-foreground: #d7dceb;
+ }
+ 
+ @theme inline {
+diff --git a/tools/ui/src/lib/assets/logo.svg b/tools/ui/src/lib/assets/logo.svg
+index 05424790afea78bd2cafd36e4bde5e52748b839d..b3bb367a86fe161398435f64e5efce0e6c6d941c 100644
+--- a/tools/ui/src/lib/assets/logo.svg
++++ b/tools/ui/src/lib/assets/logo.svg
+@@ -1,7 +1,13 @@
+-<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+-    <path d="M244.95 8C215.233 8 187.774 23.8591 172.923 49.5999L95.6009 183.625C60.2162 244.959 104.481 321.6 175.29 321.6H208L316.977 132.708C348.959 77.2719 308.95 8 244.95 8ZM208 321.6H351.947C415.982 321.6 456.013 390.91 424.013 446.377C409.155 472.132 381.681 488 351.947 488H271.29C200.481 488 156.216 411.359 191.601 350.026L208 321.6Z" fill="currentColor"/>
+-    <path d="M208 321.6H16L106.462 164.8L208 321.6Z" fill="currentColor"/>
+-    <path d="M388.923 8L208 321.6L253.6 8H388.923Z" fill="currentColor"/>
+-    <path d="M304 488H112L202.462 331.2L304 488Z" fill="currentColor"/>
+-    <path d="M496 321.6H208L419.399 454.4L496 321.6Z" fill="currentColor"/>
++<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
++    <defs>
++        <linearGradient id="llapisLogoGrad" x1="10" y1="10" x2="90" y2="90" gradientUnits="userSpaceOnUse">
++            <stop offset="0%" stop-color="#182b8f"/>
++            <stop offset="100%" stop-color="#3f9dff"/>
++        </linearGradient>
++    </defs>
++    <path d="M18 10H74L90 26V82C90 86.4183 86.4183 90 82 90H18C13.5817 90 10 86.4183 10 82V18C10 13.5817 13.5817 10 18 10Z" fill="url(#llapisLogoGrad)"/>
++    <rect x="32" y="29" width="7" height="34" rx="3.5" fill="#ffffff"/>
++    <rect x="44" y="50" width="11" height="13" rx="5.5" fill="#b9c9fb"/>
++    <rect x="60" y="29" width="7" height="34" rx="3.5" fill="#ffffff"/>
++    <rect x="72" y="50" width="11" height="13" rx="5.5" fill="#b9c9fb"/>
+ </svg>
+diff --git a/tools/ui/src/lib/components/app/chat/ChatForm/ChatFormActions/ChatFormActionAdd/ChatFormActionAddToolsSubmenu.svelte b/tools/ui/src/lib/components/app/chat/ChatForm/ChatFormActions/ChatFormActionAdd/ChatFormActionAddToolsSubmenu.svelte
+index 9a5b0cbe8621e425c48f329ca63e1503eafaa70c..6fffd92f85f9a411ad0a1f6581905bc69d2d29e6 100644
+--- a/tools/ui/src/lib/components/app/chat/ChatForm/ChatFormActions/ChatFormActionAdd/ChatFormActionAddToolsSubmenu.svelte
++++ b/tools/ui/src/lib/components/app/chat/ChatForm/ChatFormActions/ChatFormActionAdd/ChatFormActionAddToolsSubmenu.svelte
+@@ -5,7 +5,7 @@
+ 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+ 	import * as Tooltip from '$lib/components/ui/tooltip';
+ 	import { toolsStore } from '$lib/stores/tools.svelte';
+-	import { CLI_FLAGS } from '$lib/constants';
++	import { CLI_FLAGS, SERVER_COMMAND } from '$lib/constants';
+ 	import { mcpStore } from '$lib/stores/mcp.svelte';
+ 	import { useToolsPanel } from '$lib/hooks/use-tools-panel.svelte';
+ 
+@@ -34,9 +34,10 @@
+ 						<Info class="mt-0.5 h-4 w-4 shrink-0" />
+ 
+ 						<span>
+-							Run llama-server with <code>{CLI_FLAGS.TOOLS}</code> flag to enable
++							<strong>Built-in Tools</strong> are off. They let the model read, write and run
++							things on this machine, so LLapis starts without them &mdash; restart with
+ 
+-							<strong>Built-in Tools</strong>.
++							<code>{SERVER_COMMAND} {CLI_FLAGS.TOOLS} all</code> to turn them on.
+ 						</span>
+ 					</span>
+ 
+diff --git a/tools/ui/src/lib/components/app/chat/ChatScreen/ChatScreenGreeting.svelte b/tools/ui/src/lib/components/app/chat/ChatScreen/ChatScreenGreeting.svelte
+index 018949aff87a96203e1278c70ca6116fdaaf3873..b6e47de80fc6808b14c9b8b2cd2655bc1d278495 100644
+--- a/tools/ui/src/lib/components/app/chat/ChatScreen/ChatScreenGreeting.svelte
++++ b/tools/ui/src/lib/components/app/chat/ChatScreen/ChatScreenGreeting.svelte
+@@ -1,5 +1,6 @@
+ <script lang="ts">
+ 	import { serverStore } from '$lib/stores/server.svelte';
++	import { Mascot } from '$lib/components/app';
+ 
+ 	interface Props {
+ 		isEmpty: boolean;
+@@ -14,6 +15,8 @@
+ 		isEmpty && 'mb-[calc(50dvh-8rem)] md:mb-6 pointer-events-auto block!'
+ 	]}
+ >
++	<Mascot class="mx-auto mb-4 h-16 w-16 md:h-20 md:w-20" />
++
+ 	<h1 class="mb-2 text-2xl font-semibold tracking-tight md:text-3xl">Hello there</h1>
+ 
+ 	<p class="text-muted-foreground md:text-lg">
+diff --git a/tools/ui/src/lib/components/app/content/MarkdownContent/MarkdownContent.svelte b/tools/ui/src/lib/components/app/content/MarkdownContent/MarkdownContent.svelte
+index 8ac7f94483a207208be5fa890e7a927557a9032b..1a3e42418601a3d4e0b57ac5bc3bc39dadc6905a 100644
+--- a/tools/ui/src/lib/components/app/content/MarkdownContent/MarkdownContent.svelte
++++ b/tools/ui/src/lib/components/app/content/MarkdownContent/MarkdownContent.svelte
+@@ -766,8 +766,21 @@
+ 
+ 				// Yield to browser for paint. During this, new chunks coalesce
+ 				// into pendingMarkdown, so we always render the latest state.
++				// rAF never fires while the document is hidden (Chrome suspends it),
++				// which would wedge this loop with isProcessing=true and silently
++				// swallow every later chunk — the frozen streaming bubble. Race a
++				// timeout so a hidden/backgrounded tab keeps making progress.
+ 				if (pendingMarkdown !== null) {
+-					await new Promise((resolve) => requestAnimationFrame(resolve));
++					await new Promise<void>((resolve) => {
++						const raf = requestAnimationFrame(() => {
++							clearTimeout(timer);
++							resolve();
++						});
++						const timer = setTimeout(() => {
++							cancelAnimationFrame(raf);
++							resolve();
++						}, 50);
++					});
+ 				}
+ 			}
+ 		} catch (error) {
+diff --git a/tools/ui/src/lib/components/app/dialogs/DialogMcpServerAddNew.svelte b/tools/ui/src/lib/components/app/dialogs/DialogMcpServerAddNew.svelte
+index 349f7e7fbd14fe5bff784f03f2b255e915847e52..1496019d190ff46966589ad53fd65f9ef633ac56 100644
+--- a/tools/ui/src/lib/components/app/dialogs/DialogMcpServerAddNew.svelte
++++ b/tools/ui/src/lib/components/app/dialogs/DialogMcpServerAddNew.svelte
+@@ -16,6 +16,11 @@
+ 
+ 	let newServerUrl = $state('');
+ 	let newServerHeaders = $state('');
++	// Offered HERE, not only in the edit form: a server on another origin fails to connect
++	// without the proxy, and finding the switch afterwards means editing a server that
++	// already looks broken. When LLapis was started without -McpProxy the switch renders
++	// disabled and says so, which is the answer to "why can it not connect".
++	let newServerUseProxy = $state(false);
+ 	let newServerUrlError = $derived.by(() => {
+ 		if (!newServerUrl.trim()) return 'URL is required';
+ 		try {
+@@ -31,6 +36,7 @@
+ 		if (!value) {
+ 			newServerUrl = '';
+ 			newServerHeaders = '';
++			newServerUseProxy = false;
+ 		}
+ 		open = value;
+ 		onOpenChange?.(value);
+@@ -45,7 +51,8 @@
+ 			id: newServerId,
+ 			enabled: true,
+ 			url: newServerUrl.trim(),
+-			headers: newServerHeaders.trim() || undefined
++			headers: newServerHeaders.trim() || undefined,
++			useProxy: newServerUseProxy
+ 		});
+ 
+ 		conversationsStore.setMcpServerOverride(newServerId, true);
+@@ -64,8 +71,10 @@
+ 			<McpServerForm
+ 				url={newServerUrl}
+ 				headers={newServerHeaders}
++				useProxy={newServerUseProxy}
+ 				onUrlChange={(v) => (newServerUrl = v)}
+ 				onHeadersChange={(v) => (newServerHeaders = v)}
++				onUseProxyChange={(v) => (newServerUseProxy = v)}
+ 				urlError={newServerUrl ? newServerUrlError : null}
+ 				id="new-server"
+ 			/>
+diff --git a/tools/ui/src/lib/components/app/mcp/McpServerForm.svelte b/tools/ui/src/lib/components/app/mcp/McpServerForm.svelte
+index 79738e30dd16db1f6799df4c01cd544045bffa8c..22197edf33032025cda3f23247619d0dac66ff28 100644
+--- a/tools/ui/src/lib/components/app/mcp/McpServerForm.svelte
++++ b/tools/ui/src/lib/components/app/mcp/McpServerForm.svelte
+@@ -7,7 +7,7 @@
+ 	import { UrlProtocol } from '$lib/enums';
+ 	import { MCP_SERVER_URL_PLACEHOLDER } from '$lib/constants';
+ 	import { mcpStore } from '$lib/stores/mcp.svelte';
+-	import { CLI_FLAGS } from '$lib/constants';
++	import { CLI_FLAGS, SERVER_COMMAND } from '$lib/constants';
+ 
+ 	interface Props {
+ 		url: string;
+@@ -80,16 +80,15 @@
+ 				/>
+ 
+ 				<span>
+-					<span class="text-xs text-muted-foreground">Use llama-server proxy</span>
++					<span class="text-xs text-muted-foreground">Reach this server through LLapis</span>
+ 
+ 					<br />
+ 
+ 					{#if !mcpStore.isProxyAvailable}
+-						<span class="inline-flex gap-0.75 text-xs text-muted-foreground/60"
+-							>(Run <pre>llama-server</pre>
+-							with
+-							<pre>{CLI_FLAGS.MCP_PROXY}</pre>
+-							flag)</span
++						<span class="inline-flex flex-wrap gap-0.75 text-xs text-muted-foreground/60"
++							>Off. A server on another origin needs it unless it sends CORS headers &mdash;
++							restart with <pre>{SERVER_COMMAND} {CLI_FLAGS.MCP_PROXY}</pre>
++							to turn it on.</span
+ 						>
+ 					{/if}
+ 				</span>
+diff --git a/tools/ui/src/lib/components/app/misc/Logo.svelte b/tools/ui/src/lib/components/app/misc/Logo.svelte
+index ff2b7f2f0723a8d056557dd2d2570d9546626ff8..f500b2cbf3fa676a459b3ca13b6da223ab2a3705 100644
+--- a/tools/ui/src/lib/components/app/misc/Logo.svelte
++++ b/tools/ui/src/lib/components/app/misc/Logo.svelte
+@@ -1,15 +1,16 @@
+ <script>
+-	import logoMark from '$lib/assets/logo.svg?raw';
++	import mascotEopen from '$lib/assets/mascot-eopen.png';
+ 	let { class: className = '', style = '' } = $props();
+ </script>
+ 
+ <div class={className} {style}>
+-	{@html logoMark}
++	<img src={mascotEopen} alt="LLapis" />
+ </div>
+ 
+ <style>
+-	div :global(svg) {
++	div img {
+ 		width: var(--size, 1rem);
+ 		height: var(--size, 1rem);
++		object-fit: contain;
+ 	}
+ </style>
+diff --git a/tools/ui/src/lib/components/app/misc/index.ts b/tools/ui/src/lib/components/app/misc/index.ts
+index b550ae66a53cf90735c31c63b4c5b3d42596cd00..fb29e15c23a5057170d3b1b74f95b5eb0c56d3b0 100644
+--- a/tools/ui/src/lib/components/app/misc/index.ts
++++ b/tools/ui/src/lib/components/app/misc/index.ts
+@@ -55,7 +55,15 @@ export { default as CodeBlockActions } from './CodeBlockActions.svelte';
+ /**
+  * **Logo** - Application brand mark
+  *
+- * Inline SVG of the application logo. Accepts styling via the standard
+- * `class` and `style` props and inherits color via `currentColor`.
++ * Inline SVG of the application logo (fixed blue gradient gem, eyes open).
++ * Accepts styling via the standard `class` and `style` props.
+  */
+ export { default as Logo } from './Logo.svelte';
++
++/**
++ * **Mascot** - Animated brand mark for the empty-chat greeting
++ *
++ * Larger version of the logo gem that blinks on a loop: idle, then two
++ * quick blinks. Rendered only above the "Hello there" greeting.
++ */
++export { default as Mascot } from './Mascot.svelte';
+diff --git a/tools/ui/src/lib/components/app/models/ModelsSelectorOption.svelte b/tools/ui/src/lib/components/app/models/ModelsSelectorOption.svelte
+index 981111e20157d600249826653219a16e54d10f0a..c2830dd16db89cb50e055cc923855f5d68b0d1dc 100644
+--- a/tools/ui/src/lib/components/app/models/ModelsSelectorOption.svelte
++++ b/tools/ui/src/lib/components/app/models/ModelsSelectorOption.svelte
+@@ -56,6 +56,9 @@
+ 	let loadProgress = $derived(isLoading ? modelsStore.getLoadProgress(option.model) : null);
+ 	let loadPercent = $derived(Math.round(modelLoadFraction(loadProgress) * 100));
+ 	let loadTitle = $derived(modelLoadProgressText(loadProgress));
++
++	// C5.6: deleteProfile() lived here (POST /moe/profiles {"delete": name}). Removed with the
++	// rest of the profile-management surface -- see the note where its button used to be.
+ </script>
+ 
+ <div
+@@ -107,6 +110,12 @@
+ 				/>
+ 			{/if}
+ 
++			<!-- C5.6: the "delete configuration" action is GONE along with the rest of the
++			     profile-management surface. There is exactly one runtime (`llapis`), the launcher
++			     writes it on every start, and the router refuses to delete the last profile — so
++			     the button's only reachable outcomes were "no-op" and "delete the thing you are
++			     talking to". -->
++
+ 			<!-- info button: only shown when model is loaded and callback is provided -->
+ 			{#if isLoaded && onInfoClick}
+ 				<ActionIcon
+@@ -135,7 +144,7 @@
+ 						icon={RotateCw}
+ 						tooltip="Retry loading model"
+ 						class="h-3 w-3 text-red-500 hover:text-foreground"
+-						onclick={() => modelsStore.loadModel(option.model)}
++						onclick={() => onSelect(option.id)}
+ 						stopPropagationOnClick
+ 					/>
+ 				</div>
+@@ -188,7 +197,7 @@
+ 						icon={Power}
+ 						tooltip="Load model"
+ 						class="h-3 w-3 [@media(pointer:coarse)]:text-muted-foreground"
+-						onclick={() => modelsStore.loadModel(option.model)}
++						onclick={() => onSelect(option.id)}
+ 						stopPropagationOnClick
+ 					/>
+ 				</div>
+diff --git a/tools/ui/src/lib/components/app/server/ServerErrorSplash.svelte b/tools/ui/src/lib/components/app/server/ServerErrorSplash.svelte
+index 4da0d1ddfa800c1803dd144faf231647ab6b01c8..435ff45d7e6c333f5d621359606bb5f813a3ef60 100644
+--- a/tools/ui/src/lib/components/app/server/ServerErrorSplash.svelte
++++ b/tools/ui/src/lib/components/app/server/ServerErrorSplash.svelte
+@@ -7,7 +7,7 @@
+ 	import Label from '$lib/components/ui/label/label.svelte';
+ 	import { serverStore, serverLoading } from '$lib/stores/server.svelte';
+ 	import { config, settingsStore } from '$lib/stores/settings.svelte';
+-	import { SETTINGS_KEYS } from '$lib/constants';
++	import { SETTINGS_KEYS, SERVER_COMMAND } from '$lib/constants';
+ 	import { ROUTES } from '$lib/constants/routes';
+ 	import { fade, fly, scale } from 'svelte/transition';
+ 	import { KeyboardKey } from '$lib/enums';
+@@ -258,24 +258,25 @@
+ 
+ 					<div class="mt-2 space-y-3 text-xs text-muted-foreground">
+ 						<div class="space-y-2">
+-							<p class="mb-4 font-medium">Start the llama-server:</p>
++							<p class="mb-4 font-medium">Start LLapis from the checkout:</p>
+ 
+ 							<div class="rounded bg-muted/50 px-2 py-1 font-mono text-xs">
+-								<p>llama-server -hf ggml-org/gemma-3-4b-it-GGUF</p>
++								<p>{SERVER_COMMAND}</p>
+ 							</div>
+ 
+-							<p>or</p>
+-
+-							<div class="rounded bg-muted/50 px-2 py-1 font-mono text-xs">
+-								<p class="mt-1">llama-server -m locally-stored-model.gguf</p>
+-							</div>
++							<p>then reload this page.</p>
+ 						</div>
+ 						<ul class="list-disc space-y-1 pl-4">
+ 							<li>Check that the server is accessible at the correct URL</li>
+ 
+-							<li>Verify your network connection</li>
++							<li>
++								If it is still starting, the model takes a few seconds to load &mdash; the
++								terminal says when it is ready
++							</li>
++
++							<li>Run <code>llapis status</code> to see what the server is actually running</li>
+ 
+-							<li>Check server logs for any error messages</li>
++							<li>Full logs of each run are under <code>logs\</code> in the checkout</li>
+ 						</ul>
+ 					</div>
+ 				</details>
+diff --git a/tools/ui/src/lib/components/ui/alert-dialog/alert-dialog-content.svelte b/tools/ui/src/lib/components/ui/alert-dialog/alert-dialog-content.svelte
+index c0bb2a34e4f216f1ef9ffaf663753800fbec7fdd..dd14134f61a6ddd48130e09d9c3e66d1e9faf572 100644
+--- a/tools/ui/src/lib/components/ui/alert-dialog/alert-dialog-content.svelte
++++ b/tools/ui/src/lib/components/ui/alert-dialog/alert-dialog-content.svelte
+@@ -22,7 +22,7 @@
+ 			'fixed z-[999999] grid w-full gap-4 border bg-background p-6 shadow-lg duration-200',
+ 			// Mobile: Bottom sheet behavior
+ 			'right-0 bottom-0 left-0 max-h-[100dvh] translate-x-0 translate-y-0 overflow-y-auto rounded-t-lg',
+-			'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:fill-mode-forwards data-[state=closed]:slide-out-to-bottom-full',
++			'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:fill-mode-forwards data-[state=closed]:pointer-events-none! data-[state=closed]:slide-out-to-bottom-full',
+ 			'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-full',
+ 			// Desktop: Centered dialog behavior
+ 			'sm:top-[50%] sm:right-auto sm:bottom-auto sm:left-[50%] sm:max-h-[100vh] sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-lg',
+diff --git a/tools/ui/src/lib/components/ui/alert-dialog/alert-dialog-overlay.svelte b/tools/ui/src/lib/components/ui/alert-dialog/alert-dialog-overlay.svelte
+index b047dcf6c450f07b506fb0d71c42f293fe3d9ec6..94fcb54762f3231e9c6a90b55f446f9f4428235e 100644
+--- a/tools/ui/src/lib/components/ui/alert-dialog/alert-dialog-overlay.svelte
++++ b/tools/ui/src/lib/components/ui/alert-dialog/alert-dialog-overlay.svelte
+@@ -13,7 +13,7 @@
+ 	bind:ref
+ 	data-slot="alert-dialog-overlay"
+ 	class={cn(
+-		'fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:fill-mode-forwards data-[state=open]:animate-in data-[state=open]:fade-in-0',
++		'fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:fill-mode-forwards data-[state=closed]:pointer-events-none! data-[state=open]:animate-in data-[state=open]:fade-in-0',
+ 		className
+ 	)}
+ 	{...restProps}
+diff --git a/tools/ui/src/lib/components/ui/dialog/dialog-content.svelte b/tools/ui/src/lib/components/ui/dialog/dialog-content.svelte
+index 0e1b07c40ed203a75dff262acda532f049e76af7..1d94e8d0eb0f60b9ab32e6be12e379073800bc79 100644
+--- a/tools/ui/src/lib/components/ui/dialog/dialog-content.svelte
++++ b/tools/ui/src/lib/components/ui/dialog/dialog-content.svelte
+@@ -25,7 +25,7 @@
+ 		bind:ref
+ 		data-slot="dialog-content"
+ 		class={cn(
+-			`fixed top-[50%] left-[50%] z-50 grid max-h-[100dvh] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto rounded-lg border border-border/30 bg-background p-6 shadow-lg duration-200 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:fill-mode-forwards data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg md:max-h-[100vh]`,
++			`fixed top-[50%] left-[50%] z-50 grid max-h-[100dvh] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto rounded-lg border border-border/30 bg-background p-6 shadow-lg duration-200 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:fill-mode-forwards data-[state=closed]:pointer-events-none! data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg md:max-h-[100vh]`,
+ 			className
+ 		)}
+ 		{...restProps}
+diff --git a/tools/ui/src/lib/components/ui/dialog/dialog-overlay.svelte b/tools/ui/src/lib/components/ui/dialog/dialog-overlay.svelte
+index a7803f9036802cdca0b54d7094c6e3e5822081c5..a7a02e4dc692f6b803bedec1ebc7dbfb356415ac 100644
+--- a/tools/ui/src/lib/components/ui/dialog/dialog-overlay.svelte
++++ b/tools/ui/src/lib/components/ui/dialog/dialog-overlay.svelte
+@@ -13,7 +13,7 @@
+ 	bind:ref
+ 	data-slot="dialog-overlay"
+ 	class={cn(
+-		'fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:fill-mode-forwards data-[state=open]:animate-in data-[state=open]:fade-in-0',
++		'fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:fill-mode-forwards data-[state=closed]:pointer-events-none! data-[state=open]:animate-in data-[state=open]:fade-in-0',
+ 		className
+ 	)}
+ 	{...restProps}
+diff --git a/tools/ui/src/lib/components/ui/dropdown-menu/dropdown-menu-content.svelte b/tools/ui/src/lib/components/ui/dropdown-menu/dropdown-menu-content.svelte
+index 0ca0d3964acf789ca1781115d4914d681bc6941c..87634ff02f43de63f0936f1ec4b4b23ded2d1eb9 100644
+--- a/tools/ui/src/lib/components/ui/dropdown-menu/dropdown-menu-content.svelte
++++ b/tools/ui/src/lib/components/ui/dropdown-menu/dropdown-menu-content.svelte
+@@ -19,7 +19,7 @@
+ 		data-slot="dropdown-menu-content"
+ 		{sideOffset}
+ 		class={cn(
+-			'z-50 max-h-(--bits-dropdown-menu-content-available-height) min-w-[8rem] origin-(--bits-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border border-border bg-popover p-1.5 text-popover-foreground shadow-md outline-none data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:fill-mode-forwards data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 dark:border-border/20',
++			'z-50 max-h-(--bits-dropdown-menu-content-available-height) min-w-[8rem] origin-(--bits-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border border-border bg-popover p-1.5 text-popover-foreground shadow-md outline-none data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:pointer-events-none! data-[state=closed]:fade-out-0 data-[state=closed]:fill-mode-forwards data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 dark:border-border/20',
+ 			className
+ 		)}
+ 		{...restProps}
+diff --git a/tools/ui/src/lib/components/ui/dropdown-menu/dropdown-menu-sub-content.svelte b/tools/ui/src/lib/components/ui/dropdown-menu/dropdown-menu-sub-content.svelte
+index e26c51cdc23c7f350b22ebc328f396cf39293adc..28e37f2836039283fabaee98362c94e9dacf1793 100644
+--- a/tools/ui/src/lib/components/ui/dropdown-menu/dropdown-menu-sub-content.svelte
++++ b/tools/ui/src/lib/components/ui/dropdown-menu/dropdown-menu-sub-content.svelte
+@@ -13,7 +13,7 @@
+ 	bind:ref
+ 	data-slot="dropdown-menu-sub-content"
+ 	class={cn(
+-		'z-50 max-h-(--bits-dropdown-menu-content-available-height) min-w-[8rem] origin-(--bits-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border border-border bg-popover p-1.5 text-popover-foreground shadow-md outline-none data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:fill-mode-forwards data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 dark:border-border/20',
++		'z-50 max-h-(--bits-dropdown-menu-content-available-height) min-w-[8rem] origin-(--bits-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border border-border bg-popover p-1.5 text-popover-foreground shadow-md outline-none data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:pointer-events-none! data-[state=closed]:fade-out-0 data-[state=closed]:fill-mode-forwards data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 dark:border-border/20',
+ 		className
+ 	)}
+ 	{...restProps}
+diff --git a/tools/ui/src/lib/components/ui/popover/popover-content.svelte b/tools/ui/src/lib/components/ui/popover/popover-content.svelte
+index b46e928b1b90c1501644ed27530b5814cacbfab1..470bf35736a335a79c8297fb75e23e79e4d51283 100644
+--- a/tools/ui/src/lib/components/ui/popover/popover-content.svelte
++++ b/tools/ui/src/lib/components/ui/popover/popover-content.svelte
+@@ -29,7 +29,7 @@
+ 		{collisionPadding}
+ 		{avoidCollisions}
+ 		class={cn(
+-			'z-50 w-72 origin-(--bits-popover-content-transform-origin) rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-hidden data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-end-2 data-[side=right]:slide-in-from-start-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:fill-mode-forwards data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
++			'z-50 w-72 origin-(--bits-popover-content-transform-origin) rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-hidden data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-end-2 data-[side=right]:slide-in-from-start-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:pointer-events-none! data-[state=closed]:fade-out-0 data-[state=closed]:fill-mode-forwards data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
+ 			className
+ 		)}
+ 		{...restProps}
+diff --git a/tools/ui/src/lib/components/ui/select/select-content.svelte b/tools/ui/src/lib/components/ui/select/select-content.svelte
+index b54bc60c2274ce8f3e12c79830934d089a9640ef..6b56c64362eadf6bb39ad9b3bfb68fa3d7691287 100644
+--- a/tools/ui/src/lib/components/ui/select/select-content.svelte
++++ b/tools/ui/src/lib/components/ui/select/select-content.svelte
+@@ -93,7 +93,7 @@
+ 		{sideOffset}
+ 		data-slot="select-content"
+ 		class={cn(
+-			'relative z-[var(--layer-popover,1000000)] max-h-(--bits-select-content-available-height) min-w-[8rem] origin-(--bits-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md data-[side=bottom]:translate-y-1 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:-translate-x-1 data-[side=left]:slide-in-from-right-2 data-[side=right]:translate-x-1 data-[side=right]:slide-in-from-left-2 data-[side=top]:-translate-y-1 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:fill-mode-forwards data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
++			'relative z-[var(--layer-popover,1000000)] max-h-(--bits-select-content-available-height) min-w-[8rem] origin-(--bits-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md data-[side=bottom]:translate-y-1 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:-translate-x-1 data-[side=left]:slide-in-from-right-2 data-[side=right]:translate-x-1 data-[side=right]:slide-in-from-left-2 data-[side=top]:-translate-y-1 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:pointer-events-none! data-[state=closed]:fade-out-0 data-[state=closed]:fill-mode-forwards data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
+ 			className
+ 		)}
+ 		{...restProps}
+diff --git a/tools/ui/src/lib/components/ui/sheet/sheet-content.svelte b/tools/ui/src/lib/components/ui/sheet/sheet-content.svelte
+index b616c469a9188123ee8add5889800338f0d2d407..94f14d81f1abdbd2329a2e519d6101e1c3902523 100644
+--- a/tools/ui/src/lib/components/ui/sheet/sheet-content.svelte
++++ b/tools/ui/src/lib/components/ui/sheet/sheet-content.svelte
+@@ -1,7 +1,12 @@
+ <script lang="ts" module>
+ 	import { tv, type VariantProps } from 'tailwind-variants';
+ 	export const sheetVariants = tv({
+-		base: `border-border/30 dark:border-border/20 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fill-mode-forwards fixed z-50 flex flex-col gap-4 shadow-sm transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 ${PANEL_CLASSES}`,
++		// [moert] data-[state=closed]:pointer-events-none! — bits-ui unmounts the content only on
++		// animationend; when the exit animation never completes (tab throttled/backgrounded, e.g.
++		// the NATIVE FILE PICKER stealing focus at the exact moment an attachment item closes the
++		// sheet) the ghost stays mounted over the chat form and swallows every click ("add image
++		// button not working"). Closed state must never intercept pointer events.
++		base: `border-border/30 dark:border-border/20 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fill-mode-forwards data-[state=closed]:pointer-events-none! fixed z-50 flex flex-col gap-4 shadow-sm transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 ${PANEL_CLASSES}`,
+ 		variants: {
+ 			side: {
+ 				top: 'data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top inset-x-0 top-0 h-auto border-b',
+diff --git a/tools/ui/src/lib/components/ui/sheet/sheet-overlay.svelte b/tools/ui/src/lib/components/ui/sheet/sheet-overlay.svelte
+index f402d81aa6f7f0f1f068d19e7d8ec4b750167133..b5b59759215f9b1197cbec07e0780f8b2b505f91 100644
+--- a/tools/ui/src/lib/components/ui/sheet/sheet-overlay.svelte
++++ b/tools/ui/src/lib/components/ui/sheet/sheet-overlay.svelte
+@@ -13,7 +13,8 @@
+ 	bind:ref
+ 	data-slot="sheet-overlay"
+ 	class={cn(
+-		'fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:fill-mode-forwards data-[state=open]:animate-in data-[state=open]:fade-in-0',
++		// [moert] closed state must never intercept pointer events (see sheet-content.svelte)
++		'fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:fill-mode-forwards data-[state=closed]:pointer-events-none! data-[state=open]:animate-in data-[state=open]:fade-in-0',
+ 		className
+ 	)}
+ 	{...restProps}
+diff --git a/tools/ui/src/lib/constants/app.ts b/tools/ui/src/lib/constants/app.ts
+index c598f480fd4dfc3decfab10f4cf86bf8be371764..e43f9179e9f5da658445c9f51248f61e36e65ffe 100644
+--- a/tools/ui/src/lib/constants/app.ts
++++ b/tools/ui/src/lib/constants/app.ts
+@@ -1 +1,5 @@
+-export const APP_NAME = import.meta.env?.VITE_PUBLIC_APP_NAME || 'llama-ui';
++// LLapis: the product name, not the upstream tool name. This string is the
++// browser tab title, the PWA name and the "Error N - <app>" page, so leaving it as 'llama-ui'
++// meant the one surface a user looks at all day was branded as the vendored dependency.
++// VITE_PUBLIC_APP_NAME still overrides, so a stock build can put its own name back.
++export const APP_NAME = import.meta.env?.VITE_PUBLIC_APP_NAME || 'LLapis';
+diff --git a/tools/ui/src/lib/constants/cli-flags.ts b/tools/ui/src/lib/constants/cli-flags.ts
+index 4fbee8a36973da18229ddc38e607b617f7024c46..af6a005d0aa21de5824cbbbe2df7c218d0697f52 100644
+--- a/tools/ui/src/lib/constants/cli-flags.ts
++++ b/tools/ui/src/lib/constants/cli-flags.ts
+@@ -1,6 +1,17 @@
++/**
++ * How the user turns a capability on, as they would actually type it.
++ *
++ * These strings appear in the UI wherever a feature is off and the user has to be told
++ * why. They are LLapis launcher parameters, not the upstream llama-server flags they map
++ * onto: someone running LLapis has no `llama-server` on their PATH, so telling them to
++ * pass `--tools` would be advice they cannot follow.
++ */
+ export const CLI_FLAGS = {
+ 	API_KEY: '--api-key',
+-	MCP_PROXY: '--ui-mcp-proxy',
++	MCP_PROXY: '-McpProxy',
+ 	SLOTS: '--slots',
+-	TOOLS: '--tools'
++	TOOLS: '-Tools'
+ } as const;
++
++/** The command that starts the server, for messages that tell the user to start one. */
++export const SERVER_COMMAND = 'llapis serve';
+diff --git a/tools/ui/src/lib/constants/pwa.ts b/tools/ui/src/lib/constants/pwa.ts
+index 80505fabdc5196f49af0e734efba332d70353df4..3e84ac1376599a0f8c0d0ce2c1c3bc971add2f21 100644
+--- a/tools/ui/src/lib/constants/pwa.ts
++++ b/tools/ui/src/lib/constants/pwa.ts
+@@ -54,7 +54,7 @@ export const APPLE_ASSETS = {
+ export const PWA_MANIFEST = {
+ 	name: APP_NAME,
+ 	short_name: APP_NAME,
+-	description: 'Local AI chat interface powered by llama.cpp',
++	description: 'LLapis - Gemma 4 26B-A4B, run locally. Built on llama.cpp.',
+ 	start_url: './',
+ 	display: 'standalone' as const,
+ 	background_color: THEME_COLORS.BACKGROUND_LIGHT,
+@@ -313,8 +313,18 @@ export const SVELTEKIT_PWA_OPTIONS: SvelteKitPWAOptions = {
+ 	// Manifest configuration
+ 	manifest: PWA_MANIFEST,
+ 
++	// The server embeds the UI bundle and updates in lockstep with it: a waiting SW that
++	// keeps serving the previous bundle can only ever serve a STALE app against a newer
++	// backend (the recurring "rebuilt UI never shipped" class). autoUpdate makes the new
++	// SW activate and take control as soon as it is installed, no user prompt needed.
++	registerType: 'autoUpdate',
++
+ 	// Workbox configuration for generateSW strategy
+ 	workbox: {
++		// Activate immediately and take over open tabs — pairs with registerType above.
++		skipWaiting: true,
++		clientsClaim: true,
++
+ 		// Match all static assets in the build output.
+ 		// Uses '**/' because SvelteKit outputs files under _app/immutable/
+ 		// subdirectories.
+diff --git a/tools/ui/src/lib/constants/settings-registry.ts b/tools/ui/src/lib/constants/settings-registry.ts
+index 37161c8e32f5c6febb88ae7edf3adb6728c3f741..6927c4d378ed0390d30b1591d8787e39e2022d84 100644
+--- a/tools/ui/src/lib/constants/settings-registry.ts
++++ b/tools/ui/src/lib/constants/settings-registry.ts
+@@ -23,7 +23,7 @@ import type {
+ 	SettingsSectionEntry,
+ 	SettingsSection
+ } from '$lib/types';
+-import { CLI_FLAGS, DEFAULT_MCP_CONFIG } from '$lib/constants';
++import { DEFAULT_MCP_CONFIG } from '$lib/constants';
+ import McpLogo from '$lib/components/app/mcp/McpLogo.svelte';
+ import { SETTINGS_KEYS } from './settings-keys';
+ import { ROUTES, SETTINGS_SECTION_SLUGS } from './routes';
+@@ -75,7 +75,7 @@ const SETTINGS_REGISTRY: Record<string, SettingsSectionEntry> = {
+ 			{
+ 				key: SETTINGS_KEYS.API_KEY,
+ 				label: 'API Key',
+-				help: `Set the API Key if you are using <code> ${CLI_FLAGS.API_KEY} </code> option for the server.`,
++				help: 'LLapis serves 127.0.0.1 without an API key, so leave this empty. Fill it in only if you have pointed this page at some other server that requires one.',
+ 				defaultValue: '',
+ 				type: SettingsFieldType.INPUT,
+ 				section: SETTINGS_SECTION_SLUGS.GENERAL
+diff --git a/tools/ui/src/lib/hooks/use-tools-panel.svelte.ts b/tools/ui/src/lib/hooks/use-tools-panel.svelte.ts
+index 9f99d91d9eb66cd4c71ca3bc55005c1a8278ad0c..e61e8e4cdce40f989720573506ccca57e0d09534 100644
+--- a/tools/ui/src/lib/hooks/use-tools-panel.svelte.ts
++++ b/tools/ui/src/lib/hooks/use-tools-panel.svelte.ts
+@@ -1,4 +1,4 @@
+-import { CLI_FLAGS } from '$lib/constants';
++import { CLI_FLAGS, SERVER_COMMAND } from '$lib/constants';
+ import { SvelteSet } from 'svelte/reactivity';
+ import { ToolSource } from '$lib/enums';
+ import { conversationsStore } from '$lib/stores/conversations.svelte';
+@@ -47,11 +47,11 @@ export function useToolsPanel(): UseToolsPanelReturn {
+ 		if (toolsStore.toolGroups.length > 0) return null;
+ 		// Tools endpoint is unreachable (404) — server started without --tools
+ 		if (toolsStore.isToolsEndpointUnreachable) {
+-			return `To enable Built-In Tools you need to run llama-server with ${CLI_FLAGS.TOOLS} all or ${CLI_FLAGS.TOOLS} <name> flag. To see MCP Tools you need to add / enable MCP Server(s).`;
++			return `Built-in Tools are off: they let the model read, write and run things on this machine, so LLapis starts without them. Restart with \`${SERVER_COMMAND} ${CLI_FLAGS.TOOLS} all\`, or name a subset, e.g. \`${CLI_FLAGS.TOOLS} read_file,web_fetch\`. MCP Tools instead come from MCP Server(s) you add and enable.`;
+ 		}
+ 		// Other errors — return null so UI shows "Failed to load tools"
+ 		if (toolsStore.error) return null;
+-		return `To enable Built-In Tools you need to run llama-server with ${CLI_FLAGS.TOOLS} all or ${CLI_FLAGS.TOOLS} <name> flag. To see MCP Tools you need to add / enable MCP Server(s).`;
++		return `Built-in Tools are off: they let the model read, write and run things on this machine, so LLapis starts without them. Restart with \`${SERVER_COMMAND} ${CLI_FLAGS.TOOLS} all\`, or name a subset, e.g. \`${CLI_FLAGS.TOOLS} read_file,web_fetch\`. MCP Tools instead come from MCP Server(s) you add and enable.`;
+ 	});
+ 
+ 	function isGroupChecked(group: ToolGroup): boolean {
+diff --git a/tools/ui/src/lib/utils/heic-to-jpeg.ts b/tools/ui/src/lib/utils/heic-to-jpeg.ts
+index 4ccb992a3b32d02ebfda25b5dfba8043515830bc..605b29138028eb8c08e88671dc0782eb52685525 100644
+--- a/tools/ui/src/lib/utils/heic-to-jpeg.ts
++++ b/tools/ui/src/lib/utils/heic-to-jpeg.ts
+@@ -1,47 +1,20 @@
+ import { MimeTypeImage } from '$lib/enums';
+ import { HEIC_JPEG_QUALITY } from '$lib/constants/image-size';
+ 
+-// heic requires a relatively large decoder, in order to reduce primary bundle size
+-// we lazily load this decoder from a CDN when needed, and cache it for future conversions
+-const HEIC_TO_CDN_URL = 'https://cdn.jsdelivr.net/npm/heic-to@1.5.2/dist/heic-to.js';
+-
+-interface HeicToModule {
+-	heicTo(args: { blob: Blob; type: string; quality?: number }): Promise<Blob>;
+-}
+-
+-let modulePromise: Promise<HeicToModule> | null = null;
+-
+-/**
+- * Lazily load the heic-to decoder from the CDN and cache it
+- * @returns Promise resolving to the heic-to module
+- */
+-function getHeicTo(): Promise<HeicToModule> {
+-	if (!modulePromise) {
+-		modulePromise = import(/* @vite-ignore */ HEIC_TO_CDN_URL) as Promise<HeicToModule>;
+-	}
+-
+-	return modulePromise;
+-}
+-
+-/**
+- * Convert a HEIC/HEIF file to a compressed JPEG data URL
+- * @param file - The HEIC/HEIF file to convert
+- * @returns Promise resolving to JPEG data URL
+- */
+-export async function heicFileToJpegDataURL(file: File | Blob): Promise<string> {
+-	const { heicTo } = await getHeicTo();
+-	const jpegBlob = await heicTo({
+-		blob: file,
+-		type: MimeTypeImage.JPEG,
+-		quality: HEIC_JPEG_QUALITY
+-	});
+-
+-	return new Promise((resolve, reject) => {
+-		const reader = new FileReader();
+-		reader.onload = () => resolve(reader.result as string);
+-		reader.onerror = () => reject(reader.error);
+-		reader.readAsDataURL(jpegBlob);
+-	});
++// Upstream converts HEIC/HEIF by lazily importing a decoder from cdn.jsdelivr.net the first
++// time one is dropped in. That is the only outgoing request the bundle could make on its own,
++// and it would fire without the user ever choosing to go online -- so LLapis does not ship it.
++// A HEIC image is refused with a message that says what to do instead.
++//
++// Vendoring the decoder would be the other answer: it is ~1 MB of wasm+js, and nothing else in
++// the product needs it. If HEIC support is wanted later, vendor it into ui-dist rather than
++// restoring the fetch.
++export async function heicFileToJpegDataURL(_file: File | Blob): Promise<string> {
++	void HEIC_JPEG_QUALITY;
++	throw new Error(
++		'HEIC/HEIF images are not supported: converting one needs a decoder LLapis does not ship, ' +
++			'and it will not download one. Save the image as JPEG or PNG and attach that instead.'
++	);
+ }
+ 
+ /**
+diff --git a/tools/ui/src/routes/(chat)/+layout.svelte b/tools/ui/src/routes/(chat)/+layout.svelte
+index 37aa03582487fdad023f8b7763c9965d6df7a24e..273937b4864ce74f195f4d8b75aa3c386ce03db6 100644
+--- a/tools/ui/src/routes/(chat)/+layout.svelte
++++ b/tools/ui/src/routes/(chat)/+layout.svelte
+@@ -1,12 +1,14 @@
+ <script lang="ts">
+ 	import { page } from '$app/state';
+ 	import { ChatScreen } from '$lib/components/app';
++	import MoeHeaderStrip from '$lib/components/app/misc/MoeHeaderStrip.svelte';
+ 
+ 	let { children } = $props();
+ 
+ 	let showCenteredEmpty = $derived(!page.params.id);
+ </script>
+ 
++<MoeHeaderStrip />
+ <ChatScreen {showCenteredEmpty} />
+ 
+ {@render children?.()}
