@@ -10,11 +10,23 @@ the VRAM you really have — at every prompt, not once at startup. The result is
 26B model that answers on an 8 GB laptop GPU, over an OpenAI-compatible API and a
 browser UI, with nothing leaving the machine.
 
-It is one command:
+## Quick start
 
-```bash
-llapis serve
+Windows 10/11, an NVIDIA RTX 20-series card or newer, 16 GB of RAM. In PowerShell:
+
+```powershell
+git clone https://github.com/GiukK/llapis C:\llapis
+cd C:\llapis
+.\build-check.cmd            # what this machine is missing, and where to get it
+.\build-check.cmd -Build     # configure, build and test
+# put the model files in models\ (see "Models" below), then:
+.\build-cuda\Release\moert-server.exe prepare
+.\llapis.cmd setup
+.\llapis.cmd serve -Open
 ```
+
+In the rest of this file, `llapis <verb>` is short for `.\llapis.cmd <verb>`, run
+from the folder you cloned into.
 
 ---
 
@@ -142,10 +154,10 @@ cmake -S . -B build-cuda -G "Visual Studio 17 2022" -A x64 -DGGML_CUDA=ON
 The GPU's architecture is detected (see [Requirements](#requirements)); pass
 `-DCMAKE_CUDA_ARCHITECTURES` only to build for a different card than this machine's.
 
-Not sure the machine has everything? Run `.uild-check.cmd` first: it checks the GPU
+Not sure the machine has everything? Run `.\build-check.cmd` first: it checks the GPU
 and its driver, the CUDA toolkit, Visual Studio's C++ tools and CUDA integration,
 CMake, the CPU, RAM, disk and long paths, and says what is missing and where to get
-it. `.uild-check.cmd -Build` then configures, builds and runs the tests, and checks
+it. `.\build-check.cmd -Build` then configures, builds and runs the tests, and checks
 that the server starts on this GPU.
 
 If CMake cannot find the CUDA toolkit, add
@@ -451,8 +463,8 @@ Only use it on a network you control, and prefer an SSH tunnel if you have one.
 `write_file`, `exec_shell_command`, `web_fetch`, `web_search`.
 
 ```bash
-llapis serve -Tools all                    # all five
-llapis serve -Tools read_file,web_fetch    # just these two
+.\llapis.cmd serve -Tools all                    # all five
+.\llapis.cmd serve -Tools read_file,web_fetch    # just these two
 ```
 
 `write_file` and `exec_shell_command` mean the model can change files and run
@@ -556,7 +568,7 @@ There is no installer, so there is nothing to uninstall. Delete the checkout.
 To free space without losing the setup:
 
 ```bash
-llapis stop
+.\llapis.cmd stop
 Remove-Item -Recurse -Force .\models\cache\*      # derived artifacts, ~18 GB; the two big ones need `prepare` again
 Remove-Item -Recurse -Force .\build-cuda          # build tree
 Remove-Item -Recurse -Force .\logs\*
