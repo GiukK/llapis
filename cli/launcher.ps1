@@ -48,7 +48,7 @@ param(
   [Alias('Host')][string]$BindAddress = '127.0.0.1',
 
   [int]$Port       = 8077,   # HTTP port on the bound address
-  [int]$Ctx        = 4096,   # ceiling for the context; it still grows on demand up to this
+  [int]$Ctx        = 4096,   # cap on the context; unset, it grows on demand to the model's 262144 (4096 only as a fallback)
   [int]$VramBudget = 0,      # MiB the runtime may occupy; 0 = whatever is free
   [switch]$Vision,           # load the vision projector (needs models/mmproj)
   [switch]$Open,             # open the browser once the server is ready

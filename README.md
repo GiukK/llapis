@@ -19,7 +19,7 @@ git clone https://github.com/GiukK/llapis C:\llapis
 cd C:\llapis
 .\build-check.cmd            # what this machine is missing, and where to get it
 .\build-check.cmd -Build     # configure, build and test
-# put the model files in models\ (see "Models" below), then:
+# download the model files into models\ (commands in "Models" below), then:
 .\build-cuda\Release\moert-server.exe prepare
 .\llapis.cmd setup
 .\llapis.cmd serve -Open
@@ -64,7 +64,7 @@ unsupported — but you are the first to try it.
 | Compiler | Visual Studio 2022 (v17), C++ toolset | Build Tools alone are enough |
 | CMake | 3.24+ | Visual Studio 2022's bundled CMake qualifies; 3.24 is what detects your GPU's architecture |
 | Git | Git for Windows | only to clone this repository |
-| Disk | ~22 GB for `speed`, ~38 GB for `quality` | see the breakdown below |
+| Disk | ~21 GB for `speed`, ~48 GB for `quality` | see the breakdown below |
 | Node / npm | **not required** | the web UI ships prebuilt in `third_party/llama/tools/ui/dist` |
 
 **On RAM.** The IQ2 cold tier is a ~9.3 GiB file and the runtime keeps the routed
@@ -125,10 +125,11 @@ limit, and says so; it refuses only a card that cannot hold the floor at all. Be
 8 GB the cache shrinks and the cold path dominates — but VRAM is not what stops a
 small machine. RAM is: see above.
 
-**On disk.** The model files you download are 9.8 GB for `speed` (IQ2 + drafter) or 25.6 GB
-for `quality` (those plus the Q4 source); the vision projector adds 1.1 GB. On top of that,
-`models/cache/` holds ~10 GB of artifacts LLapis derives on first run. Add the build tree
-(~2 GB) and the repository itself (~0.1 GB) and you get the figures above.
+**On disk.** The model files you download are 10.5 GB for `speed` (IQ2 + drafter) or 27.5 GB
+for `quality` (those plus the Q4 source); the vision projector adds 1.2 GB. On top of that,
+`prepare` derives 8.8 GB of artifacts for `speed` or 19.6 GB for `quality` (see the table in
+[Models](#models)). Add the build tree (~1 GB) and the repository itself (~0.1 GB) and you get
+the figures above. All sizes here are measured, in GB of 10⁹ bytes.
 
 **Install path.** Keep it short. Source paths inside `third_party/llama` reach 161
 characters, so a very deep install directory is asking for trouble on a Windows
@@ -182,9 +183,11 @@ put it on the PATH. Look under
 `C:\Program Files\Microsoft Visual Studio\2022\<edition>\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin`,
 or run from "x64 Native Tools Command Prompt for VS 2022".
 
-No `--target`: the build produces `moert-server.exe` and the five test binaries
-together, and restricting it to one target has been observed not to rebuild the
-backend DLLs after their sources changed.
+No `--target`: the build produces `moert-server.exe` and the unit tests (14, run
+with `ctest -C Release` from `build-cuda`) together, and restricting it to one target
+has been observed not to rebuild the backend DLLs after their sources changed. The
+DLLs the server needs (llama.cpp's and the CUDA runtime's) are copied next to
+`build-cuda\Release\moert-server.exe` at the end of the build, so it runs on its own.
 
 Nothing in this step reaches the network. The web UI is not compiled: it is a
 prebuilt bundle in `third_party/llama/tools/ui/dist`, which upstream's
@@ -196,7 +199,7 @@ separately in `provenance/`, which no script applies. See
 
 ### 4. Models
 
-See [Models](#models) below — download two files, put them in two folders.
+See [Models](#models) below — download two files (three for `quality`), put each in its folder.
 
 ### 5. Choose the runtime
 
@@ -240,6 +243,22 @@ values are for this revision.
 | `models/high/` (quality mode only) | `gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf` | 15.8 GiB | `ef728c8e0c337fd1067b947af006e38a9ef2419e56feced4fd29b4bf0636e30c` |
 | `models/mmproj/` (only for `-Vision`) | `mmproj-F16.gguf` | 1.11 GiB | `418a6d8723067cd712235facbbc5cba6c8fbbd413fc1292d2aace5a027d5a42f` |
 
+To download them, from the folder you cloned into (`curl.exe` ships with Windows 10 and 11;
+`-C -` resumes an interrupted download when you run the same line again):
+
+```powershell
+$hf = 'https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/c099eb48e663fd284577b04978a94ffccb261841'
+curl.exe -L -C - -o models\low\gemma-4-26B-A4B-it-UD-IQ2_M.gguf      "$hf/gemma-4-26B-A4B-it-UD-IQ2_M.gguf"
+curl.exe -L -C - -o models\mtp\mtp-gemma-4-26B-A4B-it-Q8_0.gguf      "$hf/MTP/mtp-gemma-4-26B-A4B-it-Q8_0.gguf"
+# quality mode only:
+curl.exe -L -C - -o models\high\gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf   "$hf/gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf"
+# -Vision only:
+curl.exe -L -C - -o models\mmproj\mmproj-F16.gguf                    "$hf/mmproj-F16.gguf"
+```
+
+The drafter sits in the repository's `MTP/` subfolder, but it goes directly in `models\mtp\`,
+not in `models\mtp\MTP\`: each folder is read one level deep.
+
 **Other quants.** These files are the reference pair, and the only one measured. Any
 other pair of the same model works the same way — one `.gguf` in `models/low/`, a
 higher-precision one in `models/high/` (Q4 + Q8 on a 24 GB card, say): the launcher
@@ -253,7 +272,8 @@ Get-FileHash .\models\low\gemma-4-26B-A4B-it-UD-IQ2_M.gguf -Algorithm SHA256
 ```
 
 A folder resolves whatever single `.gguf` it contains, so the filename does not
-have to match — only the folder does. Two or more `.gguf` in one folder without a
+have to match — only the folder does. (The drafter head `prepare` writes next to the
+drafter in `models/mtp/` is not counted.) Two or more `.gguf` in one folder without a
 recognised name is reported rather than guessed at.
 
 `models/cache/` holds artifacts LLapis derives from the files above. Deleting any
@@ -328,7 +348,7 @@ from the drafter, the cache policy is the measured one.
 
 | Flag | Default | What it does |
 |---|---|---|
-| `serve` \| `chat` \| `setup` \| `agents` \| `help` | — | the verb (positional) |
+| `serve` \| `chat` \| `setup` \| `agents` \| `status` \| `reset` \| `stop` \| `help` | — | the verb (positional) |
 | `-Host <addr>` | `127.0.0.1` | bind address. Anything else is LAN mode — read the warning below |
 | `-Port <n>` | `8077` | HTTP port |
 | `-Ctx <n>` | grows on demand | cap the context ceiling (model maximum 262144) |
@@ -422,7 +442,28 @@ which emits, verbatim:
       "baseUrl": "http://127.0.0.1:8077/v1",
       "api": "openai-completions",
       "apiKey": "llapis-local",
-      "models": [{ "id": "llapis", "contextWindow": 65536, "maxTokens": 65536 }]
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false,
+        "supportsUsageInStreaming": false,
+        "maxTokensField": "max_tokens"
+      },
+      "models": [
+        {
+          "id": "llapis",
+          "name": "LLapis - Gemma 4 26B-A4B (local)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 65536,
+          "maxTokens": 65536,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      ]
     }
   }
 }
@@ -527,7 +568,14 @@ tenth of the speed.
 Move the checkout somewhere shorter, or enable long paths
 (`git config --global core.longpaths true`).
 
-**`no base model resolved`** — `models/low/` has no `.gguf` in it.
+**`FATAL: the low model (models\low, the fast one) is required and was not found`** —
+`models/low/` has no `.gguf` in it, or more than one and none with the expected name.
+The lines under it say which.
+
+**`moert-server.exe` exits at once, printing nothing** (exit code `-1073741515`,
+`0xC0000135`: a DLL was not found) — the DLLs next to it are missing. A build copies
+them there; rebuild (`cmake --build build-cuda --config Release`), or start it once
+through `llapis serve`, which copies them too.
 
 **`quality needs models/high`** — you chose quality without the Q4 file. Download
 it, or run `llapis setup` again and choose speed.
@@ -569,7 +617,7 @@ To free space without losing the setup:
 
 ```bash
 .\llapis.cmd stop
-Remove-Item -Recurse -Force .\models\cache\*      # derived artifacts, ~18 GB; the two big ones need `prepare` again
+Remove-Item -Recurse -Force .\models\cache\*      # derived artifacts, ~8 GB (speed) or ~19 GB (quality); `prepare` rebuilds them
 Remove-Item -Recurse -Force .\build-cuda          # build tree
 Remove-Item -Recurse -Force .\logs\*
 ```

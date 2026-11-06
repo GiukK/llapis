@@ -209,20 +209,45 @@ function Get-PortOwnerPid([int]$port) {
   # The PID that OWNS the listening socket. Not a name match: a name match would also find
   # a second LLapis serving another port, or any unrelated binary that happens to be called
   # moert-server.exe. The socket is what `llapis stop` is actually about.
+  # Returns 0 when nothing listens, -1 when something listens but Windows reports no owner.
+  # The STATE column is not trusted: on Windows 11 build 26300 the router's live listener was
+  # reported as LISTENING with PID 0 on one launch and as FIN_WAIT_1 with the right PID on the
+  # next, while it kept answering. Filtering on -State Listen made `llapis stop` say "nothing to
+  # stop" over a running server. A listener is any row on the port whose remote end is the null
+  # endpoint; a row with a real PID wins over one without.
+  $owners = @()
   try {
-    $c = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction Stop | Select-Object -First 1
-    if ($c) { return [int]$c.OwningProcess }
+    $owners = @(Get-NetTCPConnection -LocalPort $port -ErrorAction Stop |
+                Where-Object { $_.RemotePort -eq 0 } | ForEach-Object { [int]$_.OwningProcess })
   } catch {
-    # Get-NetTCPConnection is missing on some Windows editions; netstat always exists.
-    # The state word ("LISTENING") is LOCALIZED, so it is not what we match on -- a listening
-    # row is the one whose foreign address is the null endpoint, in every language.
+    # No row at all also lands here (the cmdlet throws on an empty result), and some Windows
+    # editions lack the cmdlet: netstat always exists. Its state word is LOCALIZED, which is
+    # one more reason not to match on it.
     foreach ($line in (netstat -ano -p tcp)) {
       if ($line -match '^\s+TCP\s+(\S+):(\d+)\s+(\S+)\s+\S+\s+(\d+)\s*$') {
-        if ([int]$Matches[2] -eq $port -and $Matches[3] -match ':0$') { return [int]$Matches[4] }
+        if ([int]$Matches[2] -eq $port -and $Matches[3] -match ':0$') { $owners += [int]$Matches[4] }
       }
     }
   }
-  return 0
+  if ($owners.Count -eq 0) { return 0 }
+  $real = @($owners | Where-Object { $_ -gt 0 })
+  if ($real.Count) { return $real[0] }
+  return -1
+}
+
+function Find-LlapisRouterByPort([int]$port) {
+  # For a listener whose owner Windows does not report: the router is the moert-server.exe of
+  # THIS checkout started with `--port <port>` whose parent is not itself a moert-server (the
+  # model child is started with a port of its own). Same identity checks as for a PID.
+  try {
+    $rows = @(Get-CimInstance Win32_Process -Filter "Name = 'moert-server.exe'" -ErrorAction Stop)
+  } catch { return $null }
+  $ids = @($rows | ForEach-Object { [int]$_.ProcessId })
+  $hits = @($rows | Where-Object {
+      $_.CommandLine -match ('(^|\s)--port\s+' + $port + '(\s|$)') -and $ids -notcontains [int]$_.ParentProcessId } |
+    ForEach-Object { Get-VerifiedLlapisProcess ([int]$_.ProcessId) } | Where-Object { $_ })
+  if ($hits.Count -eq 1) { return $hits[0] }
+  return $null
 }
 
 function Get-VerifiedLlapisProcess([int]$procId) {
@@ -266,8 +291,15 @@ function Invoke-LlapisStop {
   # This is also why `stop` is the ONE verb that keeps working in LAN mode, where that route
   # is not registered at all: it never needed it. The socket lookup is address-agnostic.
   $srvPid = Get-PortOwnerPid $port
-  $proc   = Get-VerifiedLlapisProcess $srvPid
+  $proc   = if ($srvPid -eq -1) { Find-LlapisRouterByPort $port } else { Get-VerifiedLlapisProcess $srvPid }
+  # Last resort when the socket table shows nothing: a router of THIS checkout started on this port
+  # is ours to stop whatever the table says (identity is verified the same way).
+  if (-not $proc -and $srvPid -eq 0) { $proc = Find-LlapisRouterByPort $port }
   if (-not $proc) {
+    if ($srvPid -eq -1) {
+      Write-Host "Port $port is in use, but Windows does not report by which process, and no LLapis server from this checkout was found on it. Not touching it." -ForegroundColor Yellow
+      return 2
+    }
     $listening = $srvPid -gt 0
     if ($listening) {
       Write-Host "Port $port is held by PID $srvPid, which is not an LLapis server from this checkout. Not touching it." -ForegroundColor Yellow

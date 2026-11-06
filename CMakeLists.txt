@@ -117,6 +117,28 @@ if(TARGET ggml-cuda)
   target_compile_definitions(moert-server PRIVATE MOE_DUAL_HAVE_CUDA_MAP)
 endif()
 
+# Stage the DLLs moert-server needs next to it. The llama/ggml ones are written to bin/<config>, and the CUDA
+# runtime lives in <toolkit>\bin\x64, which is not on PATH: without this, `moert-server.exe prepare` straight
+# after a fresh build (the README's quick start) exited with 0xc0000135 (DLL not found), printing nothing.
+# The launcher still stages the same files (cli/preset.ps1); this makes the binary runnable on its own.
+if(WIN32)
+  set(_moert_dlls "")
+  foreach(_t ggml-base ggml-cpu ggml-cuda ggml llama llama-common llama-server-impl mtmd)
+    if(TARGET ${_t})
+      list(APPEND _moert_dlls "$<TARGET_FILE:${_t}>")
+    endif()
+  endforeach()
+  if(TARGET ggml-cuda AND CUDAToolkit_BIN_DIR)
+    file(GLOB _cuda_dlls
+      "${CUDAToolkit_BIN_DIR}/x64/cudart64_*.dll" "${CUDAToolkit_BIN_DIR}/x64/cublas64_*.dll" "${CUDAToolkit_BIN_DIR}/x64/cublasLt64_*.dll"
+      "${CUDAToolkit_BIN_DIR}/cudart64_*.dll"     "${CUDAToolkit_BIN_DIR}/cublas64_*.dll"     "${CUDAToolkit_BIN_DIR}/cublasLt64_*.dll")
+    list(APPEND _moert_dlls ${_cuda_dlls})
+  endif()
+  add_custom_command(TARGET moert-server POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${_moert_dlls} "$<TARGET_FILE_DIR:moert-server>"
+    VERBATIM)
+endif()
+
 # ===========================================================================
 # CPU unit tests. No GPU, no model. Run them, do not just build them.
 # ===========================================================================

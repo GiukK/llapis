@@ -51,7 +51,9 @@ function Find-LlapisGguf([string]$dir, [string]$expected) {
   if (-not (Test-Path $dir)) { return @{ Path = $null; Why = "folder does not exist: $dir" } }
   $exact = Join-Path $dir $expected
   if (Test-Path $exact) { return @{ Path = (Resolve-Path $exact).Path; Why = 'expected filename' } }
-  $all = @(Get-ChildItem -Path $dir -Filter *.gguf -File -ErrorAction SilentlyContinue)
+  # `prepare` writes <drafter>.draft-head-r<r>.gguf NEXT TO the drafter: it is derived, not a candidate (the C++
+  # side skips it the same way). Counting it made a drafter with any other name unresolvable after `prepare`.
+  $all = @(Get-ChildItem -Path $dir -Filter *.gguf -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.draft-head-*.gguf' })
   if ($all.Count -eq 0) { return @{ Path = $null; Why = "no .gguf in $dir (expected $expected)" } }
   if ($all.Count -eq 1) { return @{ Path = $all[0].FullName; Why = "only .gguf present ($($all[0].Name))" } }
   return @{ Path = $null

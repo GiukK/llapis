@@ -53,8 +53,8 @@ else { Warn "RAM: $ramGb GB - 16 GB is the floor (the cold expert arena lives in
 
 $drive = (Get-Item $Root).PSDrive
 $freeGb = [Math]::Round($drive.Free / 1GB, 0)
-if ($freeGb -ge 45) { Ok "Free disk on ${drive}: $freeGb GB" }
-else { Warn "Free disk on ${drive}: $freeGb GB" 'Build ~2 GB; models + derived cache ~22 GB (speed) to ~38 GB (quality).' }
+if ($freeGb -ge 50) { Ok "Free disk on ${drive}: $freeGb GB" }
+else { Warn "Free disk on ${drive}: $freeGb GB" 'Build ~1 GB; models + derived cache ~20 GB (speed) to ~47 GB (quality).' }
 
 $lp = $null
 try { $lp = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name LongPathsEnabled -ErrorAction Stop).LongPathsEnabled } catch {}
@@ -189,8 +189,8 @@ if ($Build) {
   if ($Arch) { $cfg += "-DCMAKE_CUDA_ARCHITECTURES=$Arch" }
   & $cmake @cfg 2>&1 | ForEach-Object { "$_" } | Out-File -FilePath $log -Encoding utf8
   if ($LASTEXITCODE -ne 0) { Fail "configure failed - see $log"; Get-Content $log -Tail 25; exit 1 }
-  $arch = Select-String -Path $log -Pattern 'Using CMAKE_CUDA_ARCHITECTURES=(\S+)' | Select-Object -First 1
-  Ok ("configured" + $(if ($arch) { " (CUDA architectures: $($arch.Matches[0].Groups[1].Value))" } else { '' }))
+  $archLine = Select-String -Path $log -Pattern 'Using CMAKE_CUDA_ARCHITECTURES=(\S+)' | Select-Object -First 1
+  Ok ("configured" + $(if ($archLine) { " (CUDA architectures: $($archLine.Matches[0].Groups[1].Value))" } else { '' }))
 
   Section 'Build (Release; ~5-15 minutes)'
   & $cmake --build (Join-Path $Root 'build-cuda') --config Release --parallel 2>&1 | ForEach-Object { "$_" } | Out-File -FilePath $log -Encoding utf8 -Append
