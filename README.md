@@ -16,12 +16,15 @@ Windows 10/11, an NVIDIA RTX 20-series card or newer with a current driver, 16 G
 RAM. **Nothing else to install**: no compiler, no CUDA Toolkit, no Git.
 
 1. Download `llapis-<version>-win-x64.zip` from the
-   [Releases](https://github.com/GiukK/llapis/releases) page and extract it to a short
-   path, such as `C:\llapis`.
+   [Releases](https://github.com/GiukK/llapis/releases) page and extract it. It holds
+   one folder, `llapis-<version>-win-x64`, which is the LLapis folder: keep it where it
+   lands, or move and rename it, for example to `C:\llapis`. If Windows Security's
+   *Controlled folder access* is on, keep it out of Desktop and Documents, which that
+   feature protects; `build-check` tells you if it is.
 2. In PowerShell, from that folder:
 
 ```powershell
-cd C:\llapis
+cd C:\llapis                        # or wherever the extracted folder is
 .\build-check.cmd                   # checks the GPU, the driver, RAM and disk
 # download the model files into models\ (commands in "Models" below), then:
 .\bin\moert-server.exe prepare
@@ -112,7 +115,7 @@ toolkit cannot generate code for anything below compute capability **7.5**
 any architecture setting — this is the toolkit's limit, not LLapis's. Check yours
 first, before downloading anything:
 
-```bash
+```powershell
 nvidia-smi --query-gpu=name,compute_cap --format=csv
 ```
 
@@ -122,7 +125,7 @@ its generation, the CUDA kernels of the runtime and of llama.cpp alike. Pass the
 architecture only to build here for a *different* machine's GPU — the number is its
 compute capability without the dot:
 
-```bash
+```powershell
 cmake -S . -B build-cuda -G "Visual Studio 17 2022" -A x64 -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=86-real
 ```
 
@@ -176,7 +179,7 @@ and does the steps below in one go.
 
 ### 1. Clone
 
-```bash
+```powershell
 git clone https://github.com/GiukK/llapis
 ```
 
@@ -187,7 +190,7 @@ long paths: enabling Windows long paths does not help.
 
 ### 2. Configure
 
-```bash
+```powershell
 cmake -S . -B build-cuda -G "Visual Studio 17 2022" -A x64 -DGGML_CUDA=ON
 ```
 
@@ -214,7 +217,7 @@ upstream commit it came from and the list of what we changed.
 
 ### 3. Build — offline, no npm, no node
 
-```bash
+```powershell
 cmake --build build-cuda --config Release
 ```
 
@@ -244,12 +247,17 @@ See [Models](#models) below — download two files (three for `quality`), put ea
 
 ### 5. Choose the runtime
 
-```bash
+```powershell
 .\llapis.cmd setup
 ```
 
 Asks two things: `quality` or `speed`, and a VRAM budget. Writes one file,
-`llapis-user.json`. That is the whole configuration.
+`llapis-user.json`. That is the whole configuration. Without a console to answer in
+(a script, an agent), give the two answers as flags:
+`.\llapis.cmd setup -Runtime quality -VramBudget 0` (`0` = Max, all free VRAM).
+
+The VRAM budget is what LLapis itself may occupy, out of what is free when the
+server starts: VRAM other applications hold is not charged to it.
 
 `.\llapis.cmd`, not `llapis.ps1`, for every command in this file. The `.cmd` is
 not decoration: a fresh Windows account runs PowerShell under the `Restricted`
@@ -308,7 +316,7 @@ so nothing is tuned to these two.
 
 Check a download before trusting it:
 
-```bash
+```powershell
 Get-FileHash .\models\low\gemma-4-26B-A4B-it-UD-IQ2_M.gguf -Algorithm SHA256
 ```
 
@@ -328,13 +336,14 @@ of them is safe — each one rebuilds itself:
 
 **You build them yourself, once**, from the directory holding `llapis.ps1`:
 
-```bash
+```powershell
 .\bin\moert-server.exe prepare                  # the release zip
 .\build-cuda\Release\moert-server.exe prepare    # a source build
 ```
 
 The launcher does not run this for you. It is a pure offline file transform — no
-GPU, no model load — and it takes a few minutes, mostly disk.
+GPU, no model load — and its time is mostly disk: 47 s to 164 s measured for quality,
+from a fast NVMe drive to a laptop SSD.
 
 Quality mode cannot start without `base_neq4.gguf`: that splice *is* the quality
 runtime's base model. Speed mode does not use it at all.
@@ -394,9 +403,9 @@ from the drafter, the cache policy is the measured one.
 | `-Host <addr>` | `127.0.0.1` | bind address. Anything else is LAN mode — read the warning below |
 | `-Port <n>` | `8077` | HTTP port |
 | `-Ctx <n>` | grows on demand | cap the context ceiling (model maximum 262144) |
-| `-VramBudget <MiB>` | `0` | cap total VRAM for this session; 0 = use what is free |
+| `-VramBudget <MiB>` | `0` | cap the VRAM LLapis occupies this session, out of what is free at start; 0 = all of it |
 | `-Vision` | off | load the vision projector (needs `models/mmproj/`) |
-| `-Open` | off | open the browser once the server is ready |
+| `-Open` | off | open the browser once the server is ready; without it, `serve` in a console asks `Open browser? [y/N]` |
 | `-DryRun` | off | resolve everything, print the plan, start nothing |
 | `-Trace` | off | raw runtime logs |
 | `-Tools <list>` | **off** | let the *web UI* run tools on this machine — see below |
@@ -449,7 +458,7 @@ Pick `speed` if you have not downloaded the Q4 file. Pick `quality` if you have.
 - **UI**: <http://127.0.0.1:8077>
 - **API**: `http://127.0.0.1:8077/v1` — OpenAI-compatible (`/v1/chat/completions`, `/v1/models`, streaming)
 
-```bash
+```powershell
 curl.exe http://127.0.0.1:8077/v1/chat/completions -H "Content-Type: application/json" -d "{\"model\":\"llapis\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}"
 ```
 
@@ -461,7 +470,7 @@ never has to be reconfigured when any of those change.
 
 Do not invent a model name. Either read it from `/v1/models`:
 
-```bash
+```powershell
 curl.exe http://127.0.0.1:8077/v1/models
 ```
 
@@ -471,7 +480,7 @@ fails with a parameter-binding error that names neither the cause nor the fix.
 
 or take the generated provider block:
 
-```bash
+```powershell
 .\llapis.cmd agents
 ```
 
@@ -545,7 +554,7 @@ Only use it on a network you control, and prefer an SSH tunnel if you have one.
 `-Tools` lets the **web UI** run tools on this machine: `read_file`,
 `write_file`, `exec_shell_command`, `web_fetch`, `web_search`.
 
-```bash
+```powershell
 .\llapis.cmd serve -Tools all                    # all five
 .\llapis.cmd serve -Tools read_file,web_fetch    # just these two
 ```
@@ -668,7 +677,7 @@ There is no installer, so there is nothing to uninstall. Delete the folder.
 
 To free space without losing the setup:
 
-```bash
+```powershell
 .\llapis.cmd stop
 Remove-Item -Recurse -Force .\models\cache\*      # derived artifacts, ~8 GB (speed) or ~19 GB (quality); `prepare` rebuilds them
 Remove-Item -Recurse -Force .\build-cuda          # build tree (a source build only)

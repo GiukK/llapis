@@ -473,8 +473,10 @@ extern "C" int32_t moert_memmgr_finalize(moert_memmgr * m) {
     int32_t kmin = m->k_layer.empty() ? m->k : m->k_layer[0], kmax = kmin; int64_t ksum = 0;
     for (int32_t v : m->k_layer) { if (v < kmin) kmin = v; if (v > kmax) kmax = v; ksum += v; }
     if (kmin == kmax) {
+        // K as laid out (the per-layer slot count less the loan), not m->k: that is the boot K, and a
+        // runtime rebuild re-keys only k_layer -- the log said "K=4" for a slab rebuilt at K=11.
         std::fprintf(stderr, "moert-memmgr: hot slab %" PRIu64 " MiB (%d regions, K=%d, %d layers)",
-                     total >> 20, n_groups, m->k, m->n_layers);
+                     total >> 20, n_groups, kmin - m->loan, m->n_layers);
         if (m->loan > 0)
             std::fprintf(stderr, " + %d loaned slots per layer outside the slab (%" PRIu64 " MiB)",
                          m->loan, m->loan_bytes >> 20);

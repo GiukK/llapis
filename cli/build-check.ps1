@@ -59,8 +59,34 @@ else { Warn "RAM: $ramGb GB - 16 GB is the floor (the cold expert arena lives in
 
 $drive = (Get-Item $Root).PSDrive
 $freeGb = [Math]::Round($drive.Free / 1GB, 0)
-if ($freeGb -ge 50) { Ok "Free disk on ${drive}: $freeGb GB" }
-else { Warn "Free disk on ${drive}: $freeGb GB" $(if ($Release) { 'Models + derived cache: ~20 GB (speed) to ~47 GB (quality).' } else { 'Build ~1 GB; models + derived cache ~20 GB (speed) to ~47 GB (quality).' }) }
+# What the models and prepare's derived files need in all (README "Disk"), less what models\ already holds:
+# a check run after the downloads must not ask for the space they already took.
+$modelsDir = Join-Path $Root 'models'
+$haveGb = 0
+if (Test-Path $modelsDir) {
+  $haveGb = [Math]::Round(((Get-ChildItem $modelsDir -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum) / 1GB, 0)
+}
+$needQ = [Math]::Max(0, 47 - $haveGb); $needS = [Math]::Max(0, 20 - $haveGb)
+$extra = if ($Release) { 0 } else { 1 }   # a build tree
+$haveNote = if ($haveGb -gt 0) { " ($haveGb GB already in models\)" } else { '' }
+if ($freeGb -ge $needQ + $extra) { Ok "Free disk on ${drive}: $freeGb GB$haveNote" }
+elseif ($freeGb -ge $needS + $extra) { Warn "Free disk on ${drive}: $freeGb GB$haveNote" ("Enough for speed; quality needs ~{0} GB free in all (models + the files prepare derives)." -f ($needQ + $extra)) }
+else { Warn "Free disk on ${drive}: $freeGb GB$haveNote" ("Not enough for either mode: ~{0} GB free needed for speed, ~{1} GB for quality (models + the files prepare derives)." -f ($needS + $extra), ($needQ + $extra)) }
+
+# Windows Security's Controlled folder access blocks apps it does not trust from writing in Desktop,
+# Documents, Pictures, ... (external test, 2026-11-06: every write under Desktop was refused, Defender
+# event 1123). LLapis writes models\cache, logs\ and llapis-user.json, so a protected folder fails later
+# and less clearly. A write test from here would pass anyway: PowerShell is trusted, moert-server.exe is not.
+$cfa = $null
+try { $cfa = (Get-MpPreference -ErrorAction Stop).EnableControlledFolderAccess } catch {}
+if ($cfa -eq 1) {
+  $prot = @(@('Desktop', 'MyDocuments', 'MyPictures', 'MyVideos', 'MyMusic', 'Favorites') |
+            ForEach-Object { [Environment]::GetFolderPath($_) } | Where-Object { $_ })
+  try { $prot += @((Get-MpPreference).ControlledFolderAccessProtectedFolders | Where-Object { $_ }) } catch {}
+  $under = $prot | Where-Object { $Root.StartsWith($_.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
+  if ($under) { Fail "This folder is protected by Controlled folder access ($under)" 'Windows Security will block LLapis from writing its cache, logs and settings here. Move the folder outside Desktop/Documents, e.g. C:\llapis or %USERPROFILE%\llapis.' }
+  else { Ok 'Controlled folder access is on; this folder is not one it protects' }
+}
 
 # A source build has a hard depth limit that Windows long paths do NOT lift: cl.exe and nvcc are not
 # long-path aware. Measured (CMake 3.31, VS 17.14, CUDA 13.3): configure fails from 118 characters
@@ -92,7 +118,7 @@ if ($NoGpu) {
     }
   }
   $hdr = (& $smi 2>$null) -join "`n"
-  if ($hdr -match 'CUDA Version:\s*([0-9]+\.[0-9]+)') { $driverCuda = VersionOf $Matches[1]; Ok "the driver supports CUDA up to $driverCuda" }
+  if ($hdr -match 'CUDA (?:UMD )?Version:\s*([0-9]+\.[0-9]+)') { $driverCuda = VersionOf $Matches[1]; Ok "the driver supports CUDA up to $driverCuda" }
   else { Warn 'could not read the CUDA version the driver supports' }
 }
 
@@ -196,7 +222,15 @@ if ($script:fails) {
 }
 Write-Host ("All prerequisites present ({0} warning(s))." -f $script:warns) -ForegroundColor Green
 if (-not $Build -and -not $Smoke) {
-  if ($Release) { Write-Host 'Next: download the models (README, "Models"), then .\bin\moert-server.exe prepare' }
+  if ($Release) {
+    # Point at the step this install is actually at: no models yet / models but no prepare / no setup / ready.
+    $hasLow  = @(Get-ChildItem (Join-Path $Root 'models\low') -Filter '*.gguf' -ErrorAction SilentlyContinue).Count -gt 0
+    $hasPrep = Test-Path (Join-Path $Root 'models\cache\low.experts.pack')
+    if (-not $hasLow)      { Write-Host 'Next: download the models (README, "Models"), then .\bin\moert-server.exe prepare' }
+    elseif (-not $hasPrep) { Write-Host 'Next: .\bin\moert-server.exe prepare' }
+    elseif (-not (Test-Path (Join-Path $Root 'llapis-user.json'))) { Write-Host 'Next: .\llapis.cmd setup' }
+    else { Write-Host 'Next: .\llapis.cmd serve' }
+  }
   else { Write-Host 'Next: .\build-check.cmd -Build' }
   exit 0
 }

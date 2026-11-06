@@ -379,6 +379,21 @@ function Select-LlapisVram([int]$current, [int]$floor = 0) {
 }
 
 # `setup`: CHECK -> CHOICE -> ALERT/FATAL/GO. No model paths, no context, no K.
+# `llapis setup -Runtime quality|speed [-VramBudget <MiB>]`: the same two answers as the wizard, given as
+# flags -- for a script, an agent, or any shell without a console to answer in. Same model checks, same file.
+function Invoke-LlapisSetupFromFlags([string]$mode, [int]$vramBudgetMib) {
+  $mm = Resolve-LlapisModels
+  Show-LlapisModelCheck $mm
+  $eff = Assert-LlapisModels $mm $mode
+  if ($eff -eq 'speed') { $mode = 'speed' }   # quality asked, models\high missing: the ALERT above says so
+  if ($vramBudgetMib -lt 0) { $vramBudgetMib = 0 }
+  [void](Write-LlapisSetup $mode $vramBudgetMib)
+  Write-Host ""
+  Write-Host ("Saved: runtime {0}, VRAM {1}." -f $mode, $(if ($vramBudgetMib -gt 0) { "up to $vramBudgetMib MiB" } else { 'Max (all free VRAM)' }))
+  Write-Host "You can now run:  llapis chat   |   llapis serve"
+  return $true
+}
+
 function Invoke-LlapisWizard {
   Write-Host ""
   Write-Host "LLapis Setup"

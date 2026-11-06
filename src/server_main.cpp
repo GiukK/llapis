@@ -482,9 +482,14 @@ static int vkv_plan_ctx(int n_prompt_tokens, int n_predict, int n_ctx_cur) {
                          n_prompt_tokens, gen_planned, g_vkv.max_ctx);
         return 0;
     }
-    std::fprintf(stderr, "[moert-server] variable-KV GROW: need %d prompt + %d gen (of %d requested) "
+    // "no max_tokens" spelled out: the 512 is only this plan's guess, the reply itself is not capped by it
+    // (an external tester read "of 512 requested" as a limit the request never set)
+    char req[48];
+    if (n_predict > 0) std::snprintf(req, sizeof(req), "of %d requested", n_predict);
+    else               std::snprintf(req, sizeof(req), "no max_tokens: planned %d", max_gen);
+    std::fprintf(stderr, "[moert-server] variable-KV GROW: need %d prompt + %d gen (%s) "
                          "> ctx %d -> %d (gran %d, headroom %d, gen reserve %d)\n",
-                 n_prompt_tokens, gen_planned, max_gen, n_ctx_cur, c_new, g_vkv.gran, g_vkv.headroom,
+                 n_prompt_tokens, gen_planned, req, n_ctx_cur, c_new, g_vkv.gran, g_vkv.headroom,
                  g_vkv.gen_reserve);
     llapis_phase("Context too small for this turn (%d tokens) — growing %d -> %d and re-fitting the "
                  "expert cache", n_prompt_tokens, n_ctx_cur, c_new);

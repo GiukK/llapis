@@ -29,7 +29,7 @@
 [CmdletBinding()]
 param(
   # ---------------------------------------------------------------------------
-  # THE public surface: twelve parameters (+ -Verbose/-Debug). Everything else is DERIVED: K is fitted
+  # THE public surface: thirteen parameters (+ -Verbose/-Debug). Everything else is DERIVED: K is fitted
   # to measured VRAM, the context grows on demand, the prefill follows from the drafter, the cache policy
   # is the measured one. Three groups: where it listens / how big it may get / what it does on start;
   # -Tools / -McpProxy GRANT CAPABILITY (off unless asked); -NoVariableKv / -NoLoaderCut / -NoMtp turn
@@ -50,6 +50,8 @@ param(
   [int]$Port       = 8077,   # HTTP port on the bound address
   [int]$Ctx        = 4096,   # cap on the context; unset, it grows on demand to the model's 262144 (4096 only as a fallback)
   [int]$VramBudget = 0,      # MiB the runtime may occupy; 0 = whatever is free
+  # `setup` without the wizard: the runtime to save (quality|speed), with -VramBudget as the other answer.
+  [ValidateSet('quality', 'speed')][string]$Runtime,
   [switch]$Vision,           # load the vision projector (needs models/mmproj)
   [switch]$Open,             # open the browser once the server is ready
   [switch]$DryRun,           # resolve everything, print the plan, start nothing
@@ -309,7 +311,15 @@ function Stop-Launcher([int]$code = 1) { [Environment]::Exit($code) }
 
 # `setup` mode: (re)run the wizard unconditionally, then exit.
 if ($Mode -eq 'setup') {
-  if (-not $Interactive) { Write-Error "setup needs an interactive terminal."; exit 1 }
+  if ($Runtime) {
+    if (Invoke-LlapisSetupFromFlags $Runtime $VramBudget) { exit 0 } else { exit 1 }
+  }
+  if (-not $Interactive) {
+    Write-Host "setup asks two questions and needs an interactive terminal to answer them." -ForegroundColor Yellow
+    Write-Host "Without one, give the answers as flags:  llapis setup -Runtime quality|speed [-VramBudget <MiB>]"
+    Write-Host "  (-VramBudget 0 or omitted = Max, all free VRAM)"
+    exit 1
+  }
   $s = Invoke-LlapisWizard
   if ($s) { exit 0 } else { exit 1 }
 }

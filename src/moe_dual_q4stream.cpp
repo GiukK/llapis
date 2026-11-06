@@ -383,6 +383,10 @@ bool q4stream_init(const char * src_path, const char * label, bool lean_ring) {
                                !(g.hcfg.arena_exclusive && !moert_memmgr_cold_arena_mapped(g.mm)) &&
                                s_arena_proven != 0;
         ring_n = arena_src ? 1 : ((k2 >= min_k) ? 2 : 1);
+        // MOE_DUAL_Q4S_RING=1|2 forces the depth: depth 2 is chosen only on cards with VRAM to spare (a 24 GB
+        // RTX 3090 picks it; an 8 GB card never does), so this is how a small card exercises the ring path.
+        if (const char * rv = std::getenv("MOE_DUAL_Q4S_RING"); rv && (rv[0] == '1' || rv[0] == '2') && !rv[1])
+            ring_n = rv[0] - '0';
         std::cerr << "moe_dual: " << label << ": staging reserve (no-evict prefill) -> depth " << ring_n
                   << (arena_src ? " (cold pages from the RAM arena: one slot hides the transfer"
                                 : " (SSD source")
@@ -625,6 +629,18 @@ static void q4s_clear_padding() {
 
 void q4stream_begin() {
     if (!g.q4s_enabled) return;
+    // A phase starts with no pass and no slot holding anything: the previous phase's slot flags are stale.
+    // A graph that computes in this phase before any q4stream_chunk_begin (the variable-KV swap's
+    // can_seq_rm probe) stages synchronously, and the boundary decision would otherwise take an earlier
+    // pass's slot_layer as the truth and copy another layer's bytes into the hot slab (seen: hit 59%,
+    // MTP 0%, <unused25> text for the rest of the turn).
+    q4s_ring_stop();
+    {
+        std::lock_guard<std::mutex> lk(g.q4s_ring_mtx);
+        std::fill(g.q4s_slot_layer.begin(), g.q4s_slot_layer.end(), -1);
+        std::fill(g.q4s_slot_ready.begin(), g.q4s_slot_ready.end(), (char) 0);
+        g.q4s_pf_exited = true;
+    }
     g.q4s_on = true; g.q4s_error = false;
     g.q4s_arena_trip = false;   // every prompt tries the arena source again
     // P3: a fresh prompt -- fresh counts, and no copy in flight into a slot
@@ -943,6 +959,12 @@ static bool q4s_stage_layer(int il, int rs,
 // Before refilling slot s for layer il it waits until layer il-ring_n has been CONSUMED (published by
 // the callback), so it can never overwrite bytes an in-flight expert matmul is still reading.
 static void q4s_prefetch_main() {
+    struct ExitMark {   // every return path ends the pass, and a waiting topk must hear about it
+        ~ExitMark() {
+            { std::lock_guard<std::mutex> lk(g.q4s_ring_mtx); g.q4s_pf_exited = true; }
+            g.q4s_ring_cv.notify_all();
+        }
+    } exit_mark;
     const int N = g.q4s_ring_n;
     const int n_layers = g.q4s_layers_n;
     for (int il = g.q4s_pf_start_il; il < n_layers; ++il) {
@@ -990,6 +1012,7 @@ static void q4s_ring_start() {
         g.q4s_consumed_upto = -1;
         g.q4s_pf_fail = false;
         g.q4s_pf_start_il = 0;
+        g.q4s_pf_exited = false;
     }
     g.q4s_pf_run  = true;
     g.q4s_pf_thread = std::thread(q4s_prefetch_main);
@@ -1114,18 +1137,43 @@ bool q4stream_on_topk(int il) {
     const int s = il % g.q4s_ring_n;
     using clk = std::chrono::steady_clock;
     const clk::time_point w0 = clk::now();
+    bool no_pass = false;   // no prefetch pass serves this graph: stage the layer here, like depth 1
     {
         std::unique_lock<std::mutex> lk(g.q4s_ring_mtx);
-        g.q4s_ring_cv.wait(lk, [&] {
-            return g.q4s_pf_fail || (g.q4s_slot_ready[s] && g.q4s_slot_layer[s] == il);
-        });
-        if (g.q4s_pf_fail) {
-            std::cerr << "moe_dual: q4stream: prefetch read failed (l" << il << ") — aborting graph\n";
-            return false;
+        // Only q4stream_chunk_begin starts a pass. A graph that computes with the phase armed but without
+        // it -- the variable-KV context swap arms the phase for the new context's reserve, and a graph ran
+        // inside that bracket -- found no pass: the slot vectors still empty on the session's first prompt
+        // (access violation reading them), or a finished pass that would never fill this slot (a wait
+        // forever at 0% CPU). Both seen on a 24 GB RTX 3090, the first card where the ring is depth 2.
+        if (s >= (int) g.q4s_slot_ready.size() || s >= (int) g.q4s_slot_layer.size()) {
+            no_pass = true;
+        } else {
+            g.q4s_ring_cv.wait(lk, [&] {
+                return g.q4s_pf_fail || (g.q4s_slot_ready[s] && g.q4s_slot_layer[s] == il) || g.q4s_pf_exited;
+            });
+            if (g.q4s_pf_fail) {
+                std::cerr << "moe_dual: q4stream: prefetch read failed (l" << il << ") — aborting graph\n";
+                return false;
+            }
+            if (!(g.q4s_slot_ready[s] && g.q4s_slot_layer[s] == il)) {
+                no_pass = true;   // the pass ended without staging this layer
+            } else {
+                // the backend is synchronized here => every layer < il has finished computing
+                g.q4s_consumed_upto = il - 1;
+                if (il > 0) g.q4s_slot_ready[(il - 1) % g.q4s_ring_n] = 0;
+            }
         }
-        // the backend is synchronized here => every layer < il has finished computing
-        g.q4s_consumed_upto = il - 1;
-        if (il > 0) g.q4s_slot_ready[(il - 1) % g.q4s_ring_n] = 0;
+    }
+    if (no_pass) {
+        static int n_log = 0;
+        if (n_log++ < 3)
+            std::cerr << "moe_dual: q4stream: layer " << il << " computed with no prefetch pass armed -- staged "
+                         "synchronously into slot " << s << std::endl;
+        if (!q4s_stage_layer(il, s, g.q4s_wt_r[(size_t) s], g.q4s_st_r[(size_t) s])) return false;
+        // record what the slot now holds: the boundary decision (q4s_slot_of) copies hot experts out of it
+        std::lock_guard<std::mutex> lk(g.q4s_ring_mtx);
+        if (s < (int) g.q4s_slot_layer.size()) g.q4s_slot_layer[(size_t) s] = il;
+        return true;
     }
     g.q4s_ring_cv.notify_all();
     const double waited_ms = std::chrono::duration<double, std::milli>(clk::now() - w0).count();

@@ -2295,8 +2295,12 @@ server_http_proxy::server_http_proxy(
         if (result.error() != httplib::Error::Success) {
             auto err_str = httplib::to_string(result.error());
             SRV_ERR("http client error: %s\n", err_str.c_str());
-            pipe->write({{}, 500, "", ""}); // header
-            pipe->write({{}, 0, "proxy error: " + err_str, ""}); // body
+            // [llapis] an OpenAI-shaped JSON error, not plain text: a client parses the body of a failed call.
+            // The usual cause is the model process exiting mid-request; logs\ has the why.
+            const json err = format_error_response("the model process stopped while handling this request (" +
+                                                   err_str + "); see the server log", ERROR_TYPE_SERVER);
+            pipe->write({{}, 500, "", "application/json; charset=utf-8"}); // header
+            pipe->write({{}, 0, json{{"error", err}}.dump(), ""}); // body
         }
         pipe->close_write(); // signal EOF to reader
         SRV_DBG("%s", "client request thread ended\n");

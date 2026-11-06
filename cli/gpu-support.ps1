@@ -30,7 +30,7 @@ function Test-LlapisGpuSupport([string]$BinDir) {
   if (-not $smi) { return @{ Level = 'unknown'; Message = 'nvidia-smi not found' } }
 
   $hdr = (& $smi 2>$null) -join "`n"
-  if ($hdr -match 'CUDA Version:\s*([0-9]+)\.([0-9]+)') {
+  if ($hdr -match 'CUDA (?:UMD )?Version:\s*([0-9]+)\.([0-9]+)') {
     $drvMajor = [int]$Matches[1]
     if ($drvMajor -lt [int]$m.cuda_major) {
       $family = if ([int]$m.cuda_major -eq 13) { ' (the R580 family or newer)' } else { '' }

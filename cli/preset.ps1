@@ -95,12 +95,12 @@ switch ($gpuSupport.Level) {
 #     measurement harness exports on purpose (each one is read by the runtime; unset = the default):
 #     MOE_DUAL_PREFILL_MIN (the streamed-vs-fused threshold), the policy's prices
 #     MOE_DUAL_COST_H / _R / _PER_TOKEN, MOE_DUAL_ASYNC_PROMOTE, MOE_DUAL_ARENA_EXCLUSIVE,
-#     MOE_DUAL_GRAPH_SEGMENTS, MOE_DUAL_Q4S_ARENA, MOE_DUAL_PREFIX_REUSE; the bench capture traces
+#     MOE_DUAL_GRAPH_SEGMENTS, MOE_DUAL_Q4S_ARENA, MOE_DUAL_Q4S_RING (staging ring depth), MOE_DUAL_PREFIX_REUSE; the bench capture traces
 #     MOE_DUAL_ROUTE_TRACE / _CONTENT_TRACE / _CONTENT_SKIP_EMBD; and the speculative-caching arm still under
 #     evaluation (claude dump findings 216l): MOE_DUAL_RAM_DIR (batch transport), MOE_DUAL_MTP_NN / _R / _CAP
 #     (MTP forecaster), MOE_DUAL_EARLY_READY, MOE_DUAL_DIR_SM (SM copy transport, findings 231). Any other env-only knob read by this file after the wipe would be
 #     silently dead, so there are none (elision E4, 2026-10-11). ---
-$keepBatchOverrides = @('MOE_DUAL_PREFILL_MIN', 'MOE_DUAL_COST_H', 'MOE_DUAL_COST_R', 'MOE_DUAL_COST_PER_TOKEN', 'MOE_DUAL_ASYNC_PROMOTE', 'MOE_DUAL_ARENA_EXCLUSIVE', 'MOE_DUAL_GRAPH_SEGMENTS', 'MOE_DUAL_Q4S_ARENA', 'MOE_DUAL_PREFIX_REUSE', 'MOE_DUAL_EARLY_READY', 'MOE_DUAL_ROUTE_TRACE', 'MOE_DUAL_DECISION_TRACE', 'MOE_DUAL_CONTENT_TRACE', 'MOE_DUAL_CONTENT_SKIP_EMBD', 'MOE_DUAL_RAM_DIR', 'MOE_DUAL_DIR_SM', 'MOE_DUAL_DIR_SM_THREADS', 'MOE_DUAL_DIR_SM_PIN', 'MOE_DUAL_EARLY_DECIDE', 'MOE_DUAL_DIR_ENGINE', 'MOE_DUAL_DRAFT_GGUF', 'MOE_DUAL_DIR_ENGINE_MIB', 'MOE_DUAL_DIR_SM_PIN_M', 'MOE_DUAL_DIR_SM_RING_MIB', 'MOE_DUAL_MTP_NN', 'MOE_DUAL_MTP_NN_R', 'MOE_DUAL_MTP_NN_CAP', 'MOE_DUAL_LOAN', 'MOE_DUAL_LOAN_FILL', 'MOE_DUAL_ORACLE', 'MOE_DUAL_ORACLE_H', 'MOE_DUAL_ORACLE_R', 'MOE_DUAL_ORACLE_CAP', 'MOE_DUAL_L3PF', 'MOE_DUAL_L3PF_DRY')
+$keepBatchOverrides = @('MOE_DUAL_PREFILL_MIN', 'MOE_DUAL_COST_H', 'MOE_DUAL_COST_R', 'MOE_DUAL_COST_PER_TOKEN', 'MOE_DUAL_ASYNC_PROMOTE', 'MOE_DUAL_ARENA_EXCLUSIVE', 'MOE_DUAL_GRAPH_SEGMENTS', 'MOE_DUAL_Q4S_ARENA', 'MOE_DUAL_Q4S_RING', 'MOE_DUAL_PREFIX_REUSE', 'MOE_DUAL_EARLY_READY', 'MOE_DUAL_ROUTE_TRACE', 'MOE_DUAL_DECISION_TRACE', 'MOE_DUAL_CONTENT_TRACE', 'MOE_DUAL_CONTENT_SKIP_EMBD', 'MOE_DUAL_RAM_DIR', 'MOE_DUAL_DIR_SM', 'MOE_DUAL_DIR_SM_THREADS', 'MOE_DUAL_DIR_SM_PIN', 'MOE_DUAL_EARLY_DECIDE', 'MOE_DUAL_DIR_ENGINE', 'MOE_DUAL_DRAFT_GGUF', 'MOE_DUAL_DIR_ENGINE_MIB', 'MOE_DUAL_DIR_SM_PIN_M', 'MOE_DUAL_DIR_SM_RING_MIB', 'MOE_DUAL_MTP_NN', 'MOE_DUAL_MTP_NN_R', 'MOE_DUAL_MTP_NN_CAP', 'MOE_DUAL_LOAN', 'MOE_DUAL_LOAN_FILL', 'MOE_DUAL_ORACLE', 'MOE_DUAL_ORACLE_H', 'MOE_DUAL_ORACLE_R', 'MOE_DUAL_ORACLE_CAP', 'MOE_DUAL_L3PF', 'MOE_DUAL_L3PF_DRY')
 Get-ChildItem Env: | Where-Object { $_.Name -like 'MOE_DUAL_*' -and $keepBatchOverrides -notcontains $_.Name } | ForEach-Object {
   # say it: a lever dropped here silently made a whole A/B arm run the default (findings 210)
   Write-Host ("  NOTE: ignoring inherited {0}={1} (not an A/B lever; see `$keepBatchOverrides in cli/preset.ps1)" -f $_.Name, $_.Value) -ForegroundColor Yellow
@@ -193,11 +193,16 @@ function Resolve-KeepFreeMiBOnce {
     Write-Host "[llapis] -VramBudget given but nvidia-smi is unavailable — cannot convert it to a keep-free target; ignoring the budget." -ForegroundColor Yellow
     return $script:VkvKeepMib
   }
-  if ($budget -ge $total) {
-    Say-Info ("[llapis] VRAM budget {0} MiB >= card total {1} MiB — treating as MAX." -f $budget, $total)
+  # The budget is what LLAPIS may occupy, so it is taken out of the VRAM free NOW (before launch, LLapis holds
+  # none): keep = free - budget. It used to be total - budget, which charged other applications' VRAM to
+  # the budget -- 8000 MiB on a 24 GB card with 4.2 GB held by other apps left "K ceiling 0" (external test).
+  $free = Get-FreeVramMiB
+  $base = if ($free -and $free -gt 0 -and $free -lt $total) { [int]$free } else { [int]$total }
+  if ($budget -ge $base) {
+    Say-Info ("[llapis] VRAM budget {0} MiB >= the {1} MiB free now — treating as MAX." -f $budget, $base)
     return $script:VkvKeepMib
   }
-  $keep = $total - $budget
+  $keep = $base - $budget
   if ($keep -lt $script:VkvKeepMib) { $keep = $script:VkvKeepMib }
   return [int]$keep
 }
@@ -299,7 +304,7 @@ $script:KeepFreeMib = Resolve-KeepFreeMiB
 if ($script:KeepFreeMib -ne $script:VkvKeepMib) {
   $env:MOE_DUAL_VKV_KEEP_POST_MIB = "$($script:KeepFreeMib)"
   $tot = Get-TotalVramMiB
-  Write-Host ("[llapis] VRAM budget: up to {0} MiB of {1} MiB -> keeping {2} MiB free; the expert cache is sized to what is left and re-fitted at every context change. -VramBudget 0 for MAX." -f $script:VramBudgetMib, $tot, $script:KeepFreeMib) -ForegroundColor Cyan
+  Write-Host ("[llapis] VRAM budget: up to {0} MiB for LLapis ({1} MiB card) -> keeping {2} MiB free; the expert cache is sized to what is left and re-fitted at every context change. -VramBudget 0 for MAX." -f $script:VramBudgetMib, $tot, $script:KeepFreeMib) -ForegroundColor Cyan
 }
 # Variable-KV (DEFAULT ON for chat/serve; resolved in llapis.ps1, see the block after the saved
 # setup is applied). MOE_DUAL_VKV is the canonical arming name and is set HERE, after this file's own

@@ -186,6 +186,8 @@ struct State {
     std::vector<char>       q4s_slot_ready;    // [slot] contents fully uploaded and usable
     int                     q4s_consumed_upto = -1;   // highest layer whose compute is known done
     bool                    q4s_pf_run   = false;     // thread should keep going
+    bool                    q4s_pf_exited = true;     // the current pass is over (all layers staged, failed or stopped):
+                                                       // a topk still waiting on the ring after this would wait forever
     bool                    q4s_pf_fail  = false;     // reader hit an I/O error -> abort the graph
     double                  q4s_wait_ms  = 0.0;       // telemetry: callback time spent WAITING on the ring
                                                        // (exposed read; ~0 = the overlap fully hid the SSD)

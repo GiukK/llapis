@@ -114,6 +114,13 @@ function Invoke-LlapisStatus {
   $info = $null; $tel = $null
   try { $info = Invoke-RestMethod -Uri "$base/moe/info"      -TimeoutSec 5 -ErrorAction Stop } catch {}
   try { $tel  = Invoke-RestMethod -Uri "$base/moe/telemetry" -TimeoutSec 5 -ErrorAction Stop } catch {}
+  if (-not $info -and -not $tel) {
+    # The router still lists the model as loaded for a moment after its process exits.
+    Write-Host "  The model process is not answering: it may have just stopped. The log in logs\ says why;" -ForegroundColor Yellow
+    Write-Host "  the next request starts it again, or 'llapis stop' then 'llapis serve'."
+    Write-Host ""
+    return 1
+  }
   # GiB, formatted invariantly. `{0:n0}` renders 2572 as "2.572" under an it-IT console, which
   # sits next to "4608" formatted the same way and reads as two numbers three orders apart.
   function fmtGiB([double]$mib) { return ([Math]::Round($mib / 1024.0, 1)).ToString([Globalization.CultureInfo]::InvariantCulture) }
@@ -159,12 +166,17 @@ function Invoke-LlapisStatus {
   }
   if ($tel -and $tel.partition) {
     $v = $tel.partition.vram; $r = $tel.partition.ram
-    Write-Host ("  VRAM     : {0} GiB LLapis / {1} free of {2} total" -f (fmtGiB $v.ours), (fmtGiB $v.free), (fmtGiB $v.total))
+    # `free` is the headroom in the budget Windows grants THIS process (DXGI), not the card's free memory:
+    # nvidia-smi also subtracts what other applications hold, so its number is lower.
+    Write-Host ("  VRAM     : {0} GiB LLapis, room for {1} GiB more (Windows budget), {2} GiB card" -f (fmtGiB $v.ours), (fmtGiB $v.free), (fmtGiB $v.total))
     # `arena_resident` is what is physically in RAM; `arena_committed` is how big the arena IS.
     # They differ by most of the arena on a 16 GB box, which is why both are printed.
     Write-Host ("  RAM      : {0} GiB LLapis working set / {1} free of {2} total" -f (fmtGiB $r.rss), (fmtGiB $r.avail), (fmtGiB $r.total))
     Write-Host ("  cold arena: {0} GiB reserved, {1} GiB resident" -f (fmtGiB $r.arena_committed), (fmtGiB $r.arena_resident))
     Write-Host ("  hit rate : {0:p0} of expert compute served hot   (cache {1:p0} full)" -f $tel.hit_rate, $tel.occupancy)
+    $gen = if ($tel.window) { [double]$tel.window.gen_tok_per_s } else { 0 }
+    if ($gen -gt 0) { Write-Host ("  speed    : {0} tok/s, generating now" -f ([Math]::Round($gen, 1)).ToString([Globalization.CultureInfo]::InvariantCulture)) }
+    else { Write-Host "  speed    : idle (each API response carries its own in timings.predicted_per_second)" }
   }
   Write-Host ""
   Write-Host ("  API : {0}/v1   UI : {0}" -f $base)

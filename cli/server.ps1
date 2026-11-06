@@ -436,6 +436,9 @@ function Invoke-LlapisServe {
 
       # 5) stay foreground until the router exits or Ctrl+C
       while (-not $router.HasExited) { Start-Sleep -Milliseconds 500 }
+      # -1 is what `llapis stop` leaves (Stop-Process ends the router with that code): a normal stop, not a failure.
+      # A crash exits with an NTSTATUS such as 0xC0000005 and is passed through.
+      if ($router.ExitCode -eq -1) { Write-Host "[llapis] server stopped."; exit 0 }
       exit $router.ExitCode
     }
   }
