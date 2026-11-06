@@ -145,7 +145,7 @@ if (CUDAToolkit_FOUND)
     if (TARGET moert-cuda)
         target_link_libraries(ggml-cuda PRIVATE moert-cuda)
     else()
-        message(FATAL_ERROR "GGML_OP_MOE_DUAL trampoline requires the moert-cuda target — configure via the LLapis superbuild (add_subdirectory(moert) before external/llama.cpp)")
+        message(FATAL_ERROR "GGML_OP_MOE_DUAL trampoline requires the moert-cuda target — configure via the LLapis superbuild (add_subdirectory(moert) before third_party/llama)")
     endif()
 
     add_compile_definitions(GGML_CUDA_PEER_MAX_BATCH_SIZE=${GGML_CUDA_PEER_MAX_BATCH_SIZE})

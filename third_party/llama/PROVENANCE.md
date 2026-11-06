@@ -13,19 +13,19 @@ pinned SHA to re-fetch: `git clone` then `cmake` is the whole build, and it need
 | Commit | `050ee92d04c2e1f639025786dea701c70e7d4204` |
 | Tag | `b9821` |
 | License | MIT -- see `LICENSE` here and `THIRD_PARTY_LICENSES.txt` at the repo root |
-| Generated | 2026-10-08 18:19 UTC |
+| Generated | 2026-11-06 02:42 UTC |
 
 ## The boundary, in one line
 
-**LLapis owns 59 files of 1465.** Everything else is upstream at the pin, unmodified.
+**LLapis owns 71 files of 1465.** Everything else is upstream at the pin, unmodified.
 
 | | files |
 |---|---:|
 | added by LLapis | **5** |
-| modified by LLapis, carrying logic | **38** |
+| modified by LLapis, carrying logic | **50** |
 | modified by LLapis, generated output of a config change | 16 |
 | deleted by LLapis (unreachable for this vertical) | 1490 |
-| inherited untouched | 1406 |
+| inherited untouched | 1394 |
 
 Since **D-008** (F1) there is no `git pull` from upstream: the inherited files are frozen at the
 pin. They are not "kept current" -- they are simply not ours.
@@ -40,7 +40,7 @@ pin. They are not "kept current" -- they are simply not ours.
 
 ## Modified by LLapis -- the maintenance surface
 
-These 38 files carry LLapis logic. This is the real surface anyone maintaining this
+These 50 files carry LLapis logic. This is the real surface anyone maintaining this
 project has to understand; the rest of the tree is upstream's.
 
 | file | area |
@@ -49,6 +49,10 @@ project has to understand; the rest of the tree is upstream's.
 | `common/arg.cpp` | args, common, build |
 | `common/common.cpp` | args, common, build |
 | `common/common.h` | args, common, build |
+| `common/sampling.cpp` | args, common, build |
+| `common/sampling.h` | args, common, build |
+| `common/speculative.cpp` | args, common, build |
+| `common/speculative.h` | args, common, build |
 | `ggml/include/ggml-cuda.h` | the dual-precision op reaches ggml |
 | `ggml/include/ggml.h` | the dual-precision op reaches ggml |
 | `ggml/src/ggml-backend.cpp` | the dual-precision op reaches ggml |
@@ -64,6 +68,8 @@ project has to understand; the rest of the tree is upstream's.
 | `ggml/src/ggml-cuda/template-instances/generate_cu_files.py` | kernel selection, pruned to this model (F2) |
 | `ggml/src/ggml.c` | the dual-precision op reaches ggml |
 | `include/llama.h` | model and graph |
+| `src/llama-arch.cpp` | other |
+| `src/llama-arch.h` | other |
 | `src/llama-context.cpp` | model and graph |
 | `src/llama-context.h` | model and graph |
 | `src/llama-graph.cpp` | model and graph |
@@ -73,8 +79,14 @@ project has to understand; the rest of the tree is upstream's.
 | `src/llama-kv-cache.h` | KV cache: variable-KV and iSWA |
 | `src/llama-memory.h` | KV cache: variable-KV and iSWA |
 | `src/llama-model.cpp` | model and graph |
+| `src/llama-model.h` | other |
+| `src/models/gemma4-assistant.cpp` | model and graph |
 | `src/models/gemma4.cpp` | model and graph |
 | `tools/mtmd/CMakeLists.txt` | args, common, build |
+| `tools/mtmd/clip.cpp` | other |
+| `tools/mtmd/clip.h` | other |
+| `tools/mtmd/mtmd.cpp` | other |
+| `tools/mtmd/mtmd.h` | other |
 | `tools/server/CMakeLists.txt` | server |
 | `tools/server/server-context.cpp` | server |
 | `tools/server/server-context.h` | server |

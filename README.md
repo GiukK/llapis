@@ -54,8 +54,8 @@ The release is compiled for every consumer generation CUDA 13 supports, and
 | GTX 10 series and older | none: CUDA 13 does not support them | — |
 
 "Not yet" means compiled for and expected to work, but not run by us. If you run it
-on one of those, an issue with the output of `.\build-check.cmd` says whether it
-worked is the most useful report you can send.
+on one of those, the most useful report you can send is an issue saying whether it
+worked, with the output of `.\build-check.cmd` attached.
 
 ---
 
@@ -110,7 +110,7 @@ paging other applications out. `LLAPIS_PREFLIGHT_RAM=0` skips the check.
 toolkit cannot generate code for anything below compute capability **7.5**
 (Turing, the RTX 20 series). A GTX 10-series card will not build against it at
 any architecture setting — this is the toolkit's limit, not LLapis's. Check yours
-first, before installing three gigabytes of toolkit:
+first, before downloading anything:
 
 ```bash
 nvidia-smi --query-gpu=name,compute_cap --format=csv
@@ -194,7 +194,9 @@ Not sure the machine has everything? Run `.\build-check.cmd` first: it checks th
 and its driver, the CUDA toolkit, Visual Studio's C++ tools and CUDA integration,
 CMake, the CPU, RAM, disk and long paths, and says what is missing and where to get
 it. `.\build-check.cmd -Build` then configures, builds and runs the tests, and checks
-that the server starts on this GPU.
+that the CUDA code was compiled for this GPU; once the models are in place and
+`llapis setup` has run, `.\build-check.cmd -Smoke` starts the server and asks it one
+question.
 
 If CMake cannot find the CUDA toolkit, add
 `-DCUDAToolkit_ROOT="$env:CUDA_PATH"` — with **forward slashes**: backslashes in a
@@ -278,7 +280,7 @@ values are for this revision.
 | `models/high/` (quality mode only) | `gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf` | 15.8 GiB | `ef728c8e0c337fd1067b947af006e38a9ef2419e56feced4fd29b4bf0636e30c` |
 | `models/mmproj/` (only for `-Vision`) | `mmproj-F16.gguf` | 1.11 GiB | `418a6d8723067cd712235facbbc5cba6c8fbbd413fc1292d2aace5a027d5a42f` |
 
-To download them, from the folder you cloned into (`curl.exe` ships with Windows 10 and 11;
+To download them, from the LLapis folder (`curl.exe` ships with Windows 10 and 11;
 `-C -` resumes an interrupted download when you run the same line again):
 
 ```powershell
@@ -580,7 +582,7 @@ models/high/      Q4_K_XL source        (you download; quality mode only)
 models/low/       IQ2 base              (you download; required)
 models/mtp/       MTP drafter           (you download; required)
 models/mmproj/    vision projector      (you download; only for -Vision)
-models/cache/     derived artifacts     (`prepare` builds two; the runtime keeps a third)
+models/cache/     derived artifacts     (`prepare` builds them; `setup` caches the models' sizes here)
 logs/             one log per run       <timestamp>_<mode>.log
 llapis-user.json  your setup choice     (regenerate with `llapis setup`)
 bin/              server, DLLs, CUDA runtime   (the release zip)
@@ -706,10 +708,17 @@ Remove-Item -Recurse -Force .\logs\*
 
 ## Licence
 
-LLapis is MIT — see [LICENSE](LICENSE).
+LLapis is MIT — see [LICENSE](LICENSE). That licence covers the original LLapis
+code: `moert/`, `src/`, `cli/`, `tests/`, the build files, and the LLapis changes
+inside `third_party/llama` (listed in its
+[`PROVENANCE.md`](third_party/llama/PROVENANCE.md)). It does not relicense anything
+else:
 
-It builds on llama.cpp (MIT) and ships a web UI bundle containing third-party
-packages under MIT, ISC, BSD-3-Clause, Apache-2.0 and MPL-2.0.
+- llama.cpp, in `third_party/llama`, stays under its own MIT licence
+  (`third_party/llama/LICENSE`, Copyright (c) 2023-2026 The ggml authors);
+- the libraries vendored in `third_party/llama/vendor` keep their own licences;
+- the prebuilt web UI in `third_party/llama/tools/ui/dist` contains third-party
+  packages under MIT, ISC, BSD-3-Clause, Apache-2.0 and MPL-2.0.
 [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt) lists every component with
 its version, licence and source.
 

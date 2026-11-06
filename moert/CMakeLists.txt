@@ -26,7 +26,7 @@ target_compile_features(moert-memmgr PUBLIC cxx_std_17)
 # include/moert/cuda.h. Linked INTO ggml-cuda (the GGML_OP_MOE_DUAL trampoline is the
 # only caller of moert_ffn_moe; host-process code reaches the island's services through
 # ggml-cuda's exported forwarders so there is exactly ONE copy of its state). Built only
-# in CUDA configurations; this subdirectory is added BEFORE external/llama.cpp so the
+# in CUDA configurations; this subdirectory is added BEFORE third_party/llama so the
 # target exists when ggml-cuda's CMakeLists links it.
 if (GGML_CUDA)
   include(CheckLanguage)

@@ -44,9 +44,9 @@ third_party/llama/tools/ui/dist/_gzip/
 # re-running the wizard.
 llapis-user.json
 logs/
-# Written by the runtime at every turn end: which experts this machine was routing
-# to when it last ran, so the next launch starts warm. Per-machine and per-workload
-# by nature; deleting it costs one cold session.
+# Written by older versions at every turn end (the warm start was removed: every
+# session now starts with an empty expert cache). Ignored so a leftover file from an
+# old install never shows up as untracked; nothing reads it, safe to delete.
 models/cache/residency-*.bin
 # The installed models' VRAM terms (setup.ps1, Get-LlapisModelTerms), cached per file identity; rebuilt on demand.
 models/cache/fit-terms-*.json

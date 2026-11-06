@@ -19,32 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
--------------------------------------------------------------------------------
-
-SCOPE OF THIS FILE
-
-The licence above covers the original LLapis code in this repository: the
-`moert/` runtime library, `src/`, `cli/`, `scripts/`, `tests/`, the build files,
-and the LLapis changes carried by `patches/`.
-
-It does NOT relicense anything else. In particular:
-
-  * llama.cpp, which this project patches and builds against, stays under its
-    own MIT licence (Copyright (c) 2023-2026 The ggml authors). `patches/`
-    contains a diff, not a copy; the upstream sources are fetched from
-    ggml-org/llama.cpp at the pinned commit by `scripts/bootstrap.ps1`.
-
-  * The prebuilt web UI in `ui-dist/` is a compiled bundle. It contains code
-    from third-party packages, each under its own licence, and the LLapis MIT
-    grant does not extend to them.
-
-  * Third-party libraries vendored inside the llama.cpp tree and reachable from
-    the shipped binaries keep their own licences.
-
-  * Model weights are not part of this repository and are not distributed by
-    it. LLapis reads GGUF files the user obtains themselves, under whatever
-    terms the model publisher sets.
-
-THIRD_PARTY_LICENSES.txt lists every third-party component with its licence,
-version and source, and reproduces the notices those licences require.

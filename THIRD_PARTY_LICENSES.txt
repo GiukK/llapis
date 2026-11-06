@@ -444,7 +444,30 @@ KaTeX's own code is MIT (Copyright (c) 2013-2020 Khan Academy and other
 contributors), reproduced under "MIT License" above.
 
 ===============================================================================
-6. Model weights - not distributed here
+6. Release zip only - runtime binaries redistributed in bin\
+===============================================================================
+
+The source repository contains none of these. The release zip
+(llapis-<version>-win-x64.zip, built by cli/package.ps1) carries them in bin\ so
+that it runs without the CUDA Toolkit or Visual Studio installed. They are
+redistributed unmodified, in binary form, under their publishers' terms, and are
+NOT covered by the LLapis MIT licence.
+
+  NVIDIA CUDA runtime 13.x     cudart64_13.dll, cublas64_13.dll, cublasLt64_13.dll
+                               NVIDIA CUDA Toolkit End User License Agreement
+                               (these files are among its redistributable
+                               components)
+                               https://docs.nvidia.com/cuda/eula/
+
+  Microsoft Visual C++ runtime msvcp140*.dll, vcruntime140*.dll, vcomp140.dll,
+  (Visual Studio 2022, v143)   concrt140.dll, vccorlib140.dll
+                               Microsoft Visual Studio redistribution terms
+                               (app-local deployment of the VC143 CRT and OpenMP
+                               redistributables)
+                               https://learn.microsoft.com/visualstudio/releases/2022/redistribution
+
+===============================================================================
+7. Model weights - not distributed here
 ===============================================================================
 
 No model weights are in this repository and none are downloaded by the build.
