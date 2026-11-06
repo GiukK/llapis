@@ -25,6 +25,8 @@ external/
 # --- build trees and compiled artifacts ------------------------------------
 build/
 build-*/
+# Release zips written by cli/package.ps1.
+/dist/
 # Generated at CONFIGURE time by third_party/llama/scripts/ui-assets.cmake, which
 # gzips every UI asset into a parallel tree INSIDE the source directory. Derived
 # from the 134 files next to it, so it is regenerated, never committed.

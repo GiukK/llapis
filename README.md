@@ -12,21 +12,50 @@ browser UI, with nothing leaving the machine.
 
 ## Quick start
 
-Windows 10/11, an NVIDIA RTX 20-series card or newer, 16 GB of RAM. In PowerShell:
+Windows 10/11, an NVIDIA RTX 20-series card or newer with a current driver, 16 GB of
+RAM. **Nothing else to install**: no compiler, no CUDA Toolkit, no Git.
+
+1. Download `llapis-<version>-win-x64.zip` from the
+   [Releases](https://github.com/GiukK/llapis/releases) page and extract it to a short
+   path, such as `C:\llapis`.
+2. In PowerShell, from that folder:
 
 ```powershell
-git clone https://github.com/GiukK/llapis C:\llapis
 cd C:\llapis
-.\build-check.cmd            # what this machine is missing, and where to get it
-.\build-check.cmd -Build     # configure, build and test
+.\build-check.cmd                   # checks the GPU, the driver, RAM and disk
 # download the model files into models\ (commands in "Models" below), then:
-.\build-cuda\Release\moert-server.exe prepare
+.\bin\moert-server.exe prepare
 .\llapis.cmd setup
 .\llapis.cmd serve -Open
 ```
 
+Windows may warn the first time that it "protected your PC" from an unrecognised app:
+the binaries are not code-signed. **More info → Run anyway** lets them run.
+
+Building from source instead is described under [Build from source](#build-from-source);
+the commands are the same except that the server lives in `build-cuda\Release\`
+instead of `bin\`.
+
 In the rest of this file, `llapis <verb>` is short for `.\llapis.cmd <verb>`, run
-from the folder you cloned into.
+from the LLapis folder.
+
+### Which GPUs
+
+The release is compiled for every consumer generation CUDA 13 supports, and
+`build-check` (and the server, at launch) tells you whether your card is covered:
+
+| GPU | Code in the release | Tested |
+|---|---|---|
+| RTX 40 series (Ada, sm_89) | machine code | **yes** — the reference machine, RTX 4070 Laptop 8 GB |
+| RTX 30 series (Ampere, sm_86) | machine code | not yet |
+| RTX 20 / GTX 16 series (Turing, sm_75) | machine code | not yet |
+| RTX 50 series (Blackwell, sm_120) | machine code + PTX | not yet |
+| a later NVIDIA GPU | PTX, compiled by the driver at the first start (minutes, once) | no |
+| GTX 10 series and older | none: CUDA 13 does not support them | — |
+
+"Not yet" means compiled for and expected to work, but not run by us. If you run it
+on one of those, an issue with the output of `.\build-check.cmd` says whether it
+worked is the most useful report you can send.
 
 ---
 
@@ -52,20 +81,21 @@ from the folder you cloned into.
 ## Requirements
 
 Verified on the reference machine. Anything materially different is untested, not
-unsupported — but you are the first to try it.
+unsupported — but you are the first to try it. The release zip needs only the first
+five rows; the rest are for [building from source](#build-from-source).
 
 | | Reference machine | Notes |
 |---|---|---|
 | OS | Windows 11, Windows PowerShell 5.1 | PowerShell 7 also works |
 | GPU | NVIDIA RTX 4070 Laptop, 8 GB | **compute capability 7.5 or newer** — see below |
-| Driver | 592.00 | any driver supporting your CUDA toolkit |
-| CUDA | Toolkit 13.3 (`nvcc` 13.3.33) | `CUDA_PATH` must be set; the build reads it |
+| Driver | 592.00 | one that supports CUDA 13: the R580 family or newer |
 | RAM | 16 GB (15.2 GiB usable) | this is the binding constraint, see below |
-| Compiler | Visual Studio 2022 (v17), C++ toolset | Build Tools alone are enough |
-| CMake | 3.24+ | Visual Studio 2022's bundled CMake qualifies; 3.24 is what detects your GPU's architecture |
-| Git | Git for Windows | only to clone this repository |
 | Disk | ~21 GB for `speed`, ~48 GB for `quality` | see the breakdown below |
-| Node / npm | **not required** | the web UI ships prebuilt in `third_party/llama/tools/ui/dist` |
+| CUDA | Toolkit 13.3 (`nvcc` 13.3.33) | source build only; `CUDA_PATH` must be set. The release ships the runtime DLLs it needs |
+| Compiler | Visual Studio 2022 (v17), C++ toolset | source build only; Build Tools alone are enough |
+| CMake | 3.24+ | source build only; Visual Studio 2022's bundled CMake qualifies |
+| Git | Git for Windows | source build only, to clone this repository |
+| Node / npm | **not required** | the web UI is prebuilt, in the release and in `third_party/llama/tools/ui/dist` |
 
 **On RAM.** The IQ2 cold tier is a ~9.3 GiB file and the runtime keeps the routed
 working set resident in RAM. On a 16 GB machine that fits with the arena partly
@@ -138,7 +168,12 @@ containing spaces are fine — every command in this file was run from one.
 
 ---
 
-## Install
+## Build from source
+
+Only if you want to build LLapis yourself: the release zip (see [Quick start](#quick-start))
+is the same program, already built. Building needs the CUDA Toolkit, Visual Studio 2022
+and CMake (see [Requirements](#requirements)); `.\build-check.cmd -Build` checks for them
+and does the steps below in one go.
 
 ### 1. Clone
 
@@ -288,7 +323,8 @@ of them is safe — each one rebuilds itself:
 **You build them yourself, once**, from the directory holding `llapis.ps1`:
 
 ```bash
-.\build-cuda\Release\moert-server.exe prepare
+.\bin\moert-server.exe prepare                  # the release zip
+.\build-cuda\Release\moert-server.exe prepare    # a source build
 ```
 
 The launcher does not run this for you. It is a pure offline file transform — no
@@ -547,12 +583,13 @@ models/mmproj/    vision projector      (you download; only for -Vision)
 models/cache/     derived artifacts     (`prepare` builds two; the runtime keeps a third)
 logs/             one log per run       <timestamp>_<mode>.log
 llapis-user.json  your setup choice     (regenerate with `llapis setup`)
-build-cuda/       build tree
-third_party/llama llama.cpp, absorbed, LLapis changes applied (see its PROVENANCE.md)
-provenance/       how the web UI bundle was built — nothing applies or reads it
+bin/              server, DLLs, CUDA runtime   (the release zip)
+build-cuda/       build tree                   (a source build)
+third_party/llama llama.cpp, absorbed, LLapis changes applied (source only; see its PROVENANCE.md)
+provenance/       how the web UI bundle was built — nothing applies or reads it (source only)
 ```
 
-Everything is inside the checkout. LLapis writes nothing to `%APPDATA%`, the
+Everything is inside the LLapis folder. LLapis writes nothing to `%APPDATA%`, the
 registry, or anywhere else on the system.
 
 ---
@@ -573,9 +610,18 @@ Move the checkout somewhere shorter, or enable long paths
 The lines under it say which.
 
 **`moert-server.exe` exits at once, printing nothing** (exit code `-1073741515`,
-`0xC0000135`: a DLL was not found) — the DLLs next to it are missing. A build copies
-them there; rebuild (`cmake --build build-cuda --config Release`), or start it once
-through `llapis serve`, which copies them too.
+`0xC0000135`: a DLL was not found) — the DLLs next to it are missing. From the
+release zip: extract the whole zip again, into an empty folder. From a source build: a
+build copies them there; rebuild (`cmake --build build-cuda --config Release`), or start
+it once through `llapis serve`, which copies them too.
+
+**`FATAL: ... this package has no GPU code it can run`** — your GPU is older than the
+RTX 20 series (or not one the release was built for); `build-check` names it. CUDA 13
+cannot run on GTX 10 series and older at all.
+
+**`FATAL: the NVIDIA driver supports CUDA 12.x; this package needs a driver for CUDA 13`**
+— update the driver from <https://www.nvidia.com/Download/index.aspx> (the R580 family
+or newer) and start again.
 
 **`quality needs models/high`** — you chose quality without the Q4 file. Download
 it, or run `llapis setup` again and choose speed.
@@ -611,14 +657,14 @@ adds the runtime's phases; `-Trace` adds everything.
 
 ## Uninstall
 
-There is no installer, so there is nothing to uninstall. Delete the checkout.
+There is no installer, so there is nothing to uninstall. Delete the folder.
 
 To free space without losing the setup:
 
 ```bash
 .\llapis.cmd stop
 Remove-Item -Recurse -Force .\models\cache\*      # derived artifacts, ~8 GB (speed) or ~19 GB (quality); `prepare` rebuilds them
-Remove-Item -Recurse -Force .\build-cuda          # build tree
+Remove-Item -Recurse -Force .\build-cuda          # build tree (a source build only)
 Remove-Item -Recurse -Force .\logs\*
 ```
 
@@ -666,5 +712,12 @@ It builds on llama.cpp (MIT) and ships a web UI bundle containing third-party
 packages under MIT, ISC, BSD-3-Clause, Apache-2.0 and MPL-2.0.
 [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt) lists every component with
 its version, licence and source.
+
+The release zip also carries, in `bin\`, the NVIDIA CUDA runtime (`cudart64_13`,
+`cublas64_13`, `cublasLt64_13`), redistributed under the
+[NVIDIA CUDA Toolkit EULA](https://docs.nvidia.com/cuda/eula/), and the Microsoft
+Visual C++ runtime (`msvcp140`, `vcruntime140`, `vcruntime140_1`, `vcomp140`),
+redistributed under the Visual Studio redistribution terms. Those files are not
+covered by the MIT licence; `PACKAGE.txt` in the zip says the same.
 
 Model weights are not part of this repository and are not distributed by it.

@@ -124,6 +124,12 @@ $CliDir = $PSScriptRoot
 $Root   = Split-Path $CliDir -Parent
 $Rel    = Join-Path $Root 'build-cuda\Release'
 $Bin    = Join-Path $Root 'build-cuda\bin\Release'
+# The release zip has no build tree: the server, its DLLs and the CUDA runtime all sit in bin\.
+# A source checkout never has bin\ at the root, so this only ever selects the zip's layout.
+if (Test-Path (Join-Path $Root 'bin\moert-server.exe')) {
+  $Rel = Join-Path $Root 'bin'
+  $Bin = $Rel
+}
 $SrvExe = Join-Path $Rel 'moert-server.exe'
 
 # ===========================================================================

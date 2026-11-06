@@ -1,0 +1,63 @@
+# The release zip: LLapis built for every GPU generation CUDA 13 supports, plus the CUDA and Visual C++
+# runtime DLLs, so a user needs a driver and nothing else. cli/package.ps1 does the work (the same script
+# a developer runs locally); this only gives it a clean machine.
+#
+#   a tag v*            -> builds the zip and publishes it as a PRE-release on that tag (promote it by hand)
+#   Run workflow (UI)   -> builds the zip and keeps it as a workflow artifact only, publishing nothing
+#
+# GitHub's runners have no GPU: the binaries are checked with cuobjdump for every architecture, and the
+# unit tests run, but nothing touches a GPU here. Running it on real cards is the job of a real machine.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: windows-2022
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install CUDA Toolkit 13.3 (NVIDIA network installer, silent)
+        shell: pwsh
+        run: |
+          $url = 'https://developer.download.nvidia.com/compute/cuda/13.3.0/network_installers/cuda_13.3.0_windows_network.exe'
+          Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\cuda.exe"
+          $p = Start-Process -FilePath "$env:RUNNER_TEMP\cuda.exe" -ArgumentList '-s' -Wait -PassThru
+          $cuda = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3'
+          if (-not (Test-Path "$cuda\bin\nvcc.exe")) { throw "CUDA install failed (installer exit $($p.ExitCode)): no nvcc.exe" }
+          "CUDA_PATH=$cuda" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "CUDA_PATH_V13_3=$cuda" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "$cuda\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Build, test and package
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File cli\package.ps1
+
+      - name: Keep the zip as an artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: llapis-win-x64
+          path: |
+            dist/*.zip
+            dist/*.zip.sha256
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Publish a pre-release on the tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $zip = Get-ChildItem dist\*.zip | Select-Object -First 1
+          # A release published by hand on this tag (e.g. a zip verified on a real GPU) is never overwritten.
+          gh release view $env:GITHUB_REF_NAME *> $null
+          if ($LASTEXITCODE -eq 0) { Write-Host "::notice::release $env:GITHUB_REF_NAME already exists: kept as is; this build is in the workflow artifact"; exit 0 }
+          gh release create $env:GITHUB_REF_NAME $zip.FullName "$($zip.FullName).sha256" --prerelease --title "LLapis $env:GITHUB_REF_NAME" --notes "Windows x64 + NVIDIA (RTX 20 series or newer). Extract, then follow the Quick start in the README. SHA-256 in the .sha256 file."

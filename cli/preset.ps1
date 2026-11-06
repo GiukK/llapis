@@ -79,6 +79,15 @@ if ($cudaBin -and (Test-Path $cudaBin)) {
   Write-Host "         <CUDA Toolkit>\bin\x64 into $Rel -- see the README." -ForegroundColor Yellow
 }
 
+# --- a release zip: does it hold GPU code this card can run, on this driver? (cli/gpu-support.ps1) ---
+. (Join-Path $PSScriptRoot 'gpu-support.ps1')
+$gpuSupport = Test-LlapisGpuSupport $Rel
+switch ($gpuSupport.Level) {
+  'none'   { Write-Host "FATAL: $($gpuSupport.Message)" -ForegroundColor Red; Stop-Launcher 1 }
+  'driver' { Write-Host "FATAL: $($gpuSupport.Message)" -ForegroundColor Red; Stop-Launcher 1 }
+  'jit'    { Write-Host "[llapis] note: $($gpuSupport.Message)" -ForegroundColor Yellow }
+}
+
 # --- clear any inherited MOE_DUAL_* (and our GGML_CUDA_* toggles) so a preset is deterministic.
 #     GGML_CUDA_MOE_DUAL_GRAPH leaking between arms in one shell let the graph-disable override
 #     survive into a staging-ring run -> mid-capture sync -> CUDA "operation not permitted" crash.

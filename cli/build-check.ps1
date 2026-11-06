@@ -10,6 +10,8 @@
 #   -NoGpu -Arch 86-real         build on a machine without an NVIDIA GPU (a VM, a CI runner): the GPU
 #                                checks are skipped and the CUDA code is compiled for -Arch
 #   -Arch <list>                 with a GPU too: compile for these architectures instead of this GPU's
+# From the RELEASE ZIP (bin\moert-server.exe, no sources) it checks only what running needs -- GPU,
+# driver, CPU, RAM, disk, and that the package holds code for this GPU -- and -Build does not apply.
 # Every check prints [ OK ], [WARN] or [FAIL]; any FAIL exits 1. Nothing is installed or changed
 # except build-cuda\ (with -Build) and logs\ (with -Smoke).
 # ===========================================================================
@@ -18,6 +20,9 @@ param([switch]$Build, [switch]$Smoke, [switch]$NoGpu, [string]$Arch)
 $ErrorActionPreference = 'Continue'
 $Root = Split-Path $PSScriptRoot -Parent
 $script:fails = 0; $script:warns = 0
+# The release zip ships bin\moert-server.exe and no sources: nothing to compile, so no toolchain to check.
+$Release = (Test-Path (Join-Path $Root 'bin\moert-server.exe')) -and -not (Test-Path (Join-Path $Root 'CMakeLists.txt'))
+. (Join-Path $PSScriptRoot 'gpu-support.ps1')
 
 function Ok([string]$m)   { Write-Host "[ OK ] $m" -ForegroundColor Green }
 function Warn([string]$m, [string]$fix) {
@@ -31,7 +36,8 @@ function Fail([string]$m, [string]$fix) {
 function Section([string]$t) { Write-Host ""; Write-Host "--- $t" -ForegroundColor Cyan }
 function VersionOf([string]$s) { try { return [version]$s } catch { return $null } }
 
-Write-Host "LLapis build check  ($Root)"
+Write-Host ("LLapis {0} check  ({1})" -f $(if ($Release) { 'package' } else { 'build' }), $Root)
+if ($Release -and $Build) { Write-Host '[FAIL] -Build: this is the release package, there is nothing to build. Run the check without -Build.' -ForegroundColor Red; exit 1 }
 
 # --- system --------------------------------------------------------------
 Section 'System'
@@ -54,11 +60,12 @@ else { Warn "RAM: $ramGb GB - 16 GB is the floor (the cold expert arena lives in
 $drive = (Get-Item $Root).PSDrive
 $freeGb = [Math]::Round($drive.Free / 1GB, 0)
 if ($freeGb -ge 50) { Ok "Free disk on ${drive}: $freeGb GB" }
-else { Warn "Free disk on ${drive}: $freeGb GB" 'Build ~1 GB; models + derived cache ~20 GB (speed) to ~47 GB (quality).' }
+else { Warn "Free disk on ${drive}: $freeGb GB" $(if ($Release) { 'Models + derived cache: ~20 GB (speed) to ~47 GB (quality).' } else { 'Build ~1 GB; models + derived cache ~20 GB (speed) to ~47 GB (quality).' }) }
 
 $lp = $null
 try { $lp = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name LongPathsEnabled -ErrorAction Stop).LongPathsEnabled } catch {}
-if ($lp -eq 1) { Ok 'Windows long paths enabled' }
+if ($Release) { }   # the package's own paths are short; only the source tree reaches 161 characters
+elseif ($lp -eq 1) { Ok 'Windows long paths enabled' }
 elseif ($Root.Length -le 60) { Ok ("Install path is short enough ({0} characters; long paths are off)" -f $Root.Length) }
 else { Warn ("Install path is {0} characters and Windows long paths are off" -f $Root.Length) 'Source paths reach 161 characters: move the folder to a short path such as C:\llapis.' }
 
@@ -81,7 +88,7 @@ if ($NoGpu) {
     $gpuCc = VersionOf $f[1]
     Ok ("GPU: {0}, compute capability {1}, {2}, driver {3}" -f $f[0], $f[1], $f[3], $f[2])
     if ($gpuCc -and $gpuCc -lt [version]'7.5') {
-      Fail "compute capability $($f[1]) is below 7.5" 'CUDA 13 cannot build for Maxwell, Pascal or Volta (GTX 10 series and older): an RTX 20 or newer is needed.'
+      Fail "compute capability $($f[1]) is below 7.5" 'CUDA 13 does not support Maxwell, Pascal or Volta (GTX 10 series and older): an RTX 20 or newer is needed.'
     }
   }
   $hdr = (& $smi 2>$null) -join "`n"
@@ -89,7 +96,26 @@ if ($NoGpu) {
   else { Warn 'could not read the CUDA version the driver supports' }
 }
 
+# --- the release package: its files, and GPU code for this card ------------------
+if ($Release) {
+  Section 'LLapis package'
+  $missing = @('moert-server.exe', 'ggml-cuda.dll', 'llama.dll', 'cudart64_13.dll', 'cublas64_13.dll', 'cublasLt64_13.dll', 'vcruntime140.dll', 'llapis-build.json') |
+    Where-Object { -not (Test-Path (Join-Path $Root "bin\$_")) }
+  if ($missing) { Fail ("bin\ is missing: {0}" -f ($missing -join ', ')) 'Extract the whole zip again, into an empty folder.' } else { Ok 'bin\ holds the server, its DLLs and the CUDA runtime' }
+  if (-not $NoGpu) {
+    $gs = Test-LlapisGpuSupport (Join-Path $Root 'bin')
+    switch ($gs.Level) {
+      'ok'      { Ok $gs.Message }
+      'jit'     { Warn $gs.Message }
+      'none'    { Fail $gs.Message }
+      'driver'  { Fail $gs.Message }
+      default   { Warn "could not check the GPU code: $($gs.Message)" }
+    }
+  }
+}
+
 # --- CUDA toolkit -----------------------------------------------------------
+if (-not $Release) {
 Section 'CUDA Toolkit'
 $cudaVer = $null
 if (-not $env:CUDA_PATH) {
@@ -160,6 +186,7 @@ else { Ok "CMake $cmVer ($cmake)" }
 
 Section 'Git (only to clone the repository)'
 if (Get-Command git -ErrorAction SilentlyContinue) { Ok ((git --version) -join ' ') } else { Warn 'git not found' 'Only needed to clone; a zip of the repository works without it.' }
+}   # -not $Release
 
 # --- summary of the prerequisites ------------------------------------------------
 Write-Host ""
@@ -168,10 +195,14 @@ if ($script:fails) {
   exit 1
 }
 Write-Host ("All prerequisites present ({0} warning(s))." -f $script:warns) -ForegroundColor Green
-if (-not $Build -and -not $Smoke) { Write-Host 'Next: .\build-check.cmd -Build'; exit 0 }
+if (-not $Build -and -not $Smoke) {
+  if ($Release) { Write-Host 'Next: download the models (README, "Models"), then .\bin\moert-server.exe prepare' }
+  else { Write-Host 'Next: .\build-check.cmd -Build' }
+  exit 0
+}
 
 # --- build and test -------------------------------------------------------
-$rel = Join-Path $Root 'build-cuda\Release'
+$rel = if ($Release) { Join-Path $Root 'bin' } else { Join-Path $Root 'build-cuda\Release' }
 if ($Build) {
   Section 'Configure (build-cuda)'
   $cudaRoot = $env:CUDA_PATH -replace '\\', '/'   # forward slashes: a backslash in a -D value is an escape to CMake
