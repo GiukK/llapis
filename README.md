@@ -161,10 +161,9 @@ for `quality` (those plus the Q4 source); the vision projector adds 1.2 GB. On t
 [Models](#models)). Add the build tree (~1 GB) and the repository itself (~0.1 GB) and you get
 the figures above. All sizes here are measured, in GB of 10⁹ bytes.
 
-**Install path.** Keep it short. Source paths inside `third_party/llama` reach 161
-characters, so a very deep install directory is asking for trouble on a Windows
-without long paths enabled. `C:\llapis` or `%USERPROFILE%\llapis` is fine. Paths
-containing spaces are fine — every command in this file was run from one.
+**Install path.** Any folder works for the release zip, including one with spaces in
+its name: every command in this file was run from one. A source build has one limit,
+under [Build from source](#build-from-source).
 
 ---
 
@@ -181,6 +180,11 @@ and does the steps below in one go.
 git clone https://github.com/GiukK/llapis
 ```
 
+**Folder depth.** Keep the checkout path within about 110 characters, as `C:\llapis`
+or `%USERPROFILE%\llapis` easily are; `build-check` warns above that. From about 115
+characters the build fails, because the CUDA and MSVC compilers do not support
+long paths: enabling Windows long paths does not help.
+
 ### 2. Configure
 
 ```bash
@@ -192,7 +196,7 @@ The GPU's architecture is detected (see [Requirements](#requirements)); pass
 
 Not sure the machine has everything? Run `.\build-check.cmd` first: it checks the GPU
 and its driver, the CUDA toolkit, Visual Studio's C++ tools and CUDA integration,
-CMake, the CPU, RAM, disk and long paths, and says what is missing and where to get
+CMake, the CPU, RAM, disk and the folder depth, and says what is missing and where to get
 it. `.\build-check.cmd -Build` then configures, builds and runs the tests, and checks
 that the CUDA code was compiled for this GPU; once the models are in place and
 `llapis setup` has run, `.\build-check.cmd -Smoke` starts the server and asks it one
@@ -603,9 +607,10 @@ set, and pass `-DCUDAToolkit_ROOT="$env:CUDA_PATH"` with forward slashes. Do not
 configure without CUDA: it produces a CPU-only build that looks fine and runs at a
 tenth of the speed.
 
-**`git clone failed` / `Filename too long`** — your install path is too deep.
-Move the checkout somewhere shorter, or enable long paths
-(`git config --global core.longpaths true`).
+**`Looking for a CUDA compiler - NOTFOUND` although the CUDA Toolkit is installed, or
+`'cl.exe' died with status 0xC0000409`** — the checkout folder is too deep. Move it
+to a shorter path such as `C:\llapis`, delete `build-cuda`, and build again: see
+[Build from source](#build-from-source), step 1.
 
 **`FATAL: the low model (models\low, the fast one) is required and was not found`** —
 `models/low/` has no `.gguf` in it, or more than one and none with the expected name.

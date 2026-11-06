@@ -13,7 +13,11 @@ rule the release is built on is: *if the shipped launcher cannot reach it, it do
 Upstream's `scripts/ui-assets.cmake` takes the pre-built `tools/ui/dist` with priority 1 and then
 `return()`s, and `LLAMA_BUILD_UI` is `OFF`, so `tools/ui/src/**` is never compiled in a user's
 build. Putting those 32 files into the tree would add source that nothing reads and that a user
-has no way to turn into the bundle they are already running.
+has no way to turn into the bundle they are already running. For the same reason upstream's own
+UI project (`tools/ui/src`, its tests, its npm configuration) is not in `third_party/llama` either:
+only `CMakeLists.txt`, `embed.cpp`, `sources.cmake` and `dist/` remain, the files the build reads.
+Its paths reached 179 characters, which broke a `git clone` into a deep folder on a Windows
+without long paths. The recipe below starts from a fresh upstream checkout and never needed it.
 
 ## Contents
 

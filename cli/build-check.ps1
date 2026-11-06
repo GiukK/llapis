@@ -62,12 +62,12 @@ $freeGb = [Math]::Round($drive.Free / 1GB, 0)
 if ($freeGb -ge 50) { Ok "Free disk on ${drive}: $freeGb GB" }
 else { Warn "Free disk on ${drive}: $freeGb GB" $(if ($Release) { 'Models + derived cache: ~20 GB (speed) to ~47 GB (quality).' } else { 'Build ~1 GB; models + derived cache ~20 GB (speed) to ~47 GB (quality).' }) }
 
-$lp = $null
-try { $lp = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name LongPathsEnabled -ErrorAction Stop).LongPathsEnabled } catch {}
-if ($Release) { }   # the package's own paths are short; only the source tree reaches 161 characters
-elseif ($lp -eq 1) { Ok 'Windows long paths enabled' }
-elseif ($Root.Length -le 60) { Ok ("Install path is short enough ({0} characters; long paths are off)" -f $Root.Length) }
-else { Warn ("Install path is {0} characters and Windows long paths are off" -f $Root.Length) 'Source paths reach 161 characters: move the folder to a short path such as C:\llapis.' }
+# A source build has a hard depth limit that Windows long paths do NOT lift: cl.exe and nvcc are not
+# long-path aware. Measured (CMake 3.31, VS 17.14, CUDA 13.3): configure fails from 118 characters
+# (cl.exe dies with 0xC0000409 inside CMake's CUDA try-compile scratch folder); 115 builds fine.
+if ($Release) { }   # the package's own paths stay under 50 characters; only a build tree gets long
+elseif ($Root.Length -le 110) { Ok ("Folder path is short enough for a build ({0} characters, limit ~115)" -f $Root.Length) }
+else { Warn ("Folder path is {0} characters: too deep for a build" -f $Root.Length) 'The CUDA and MSVC compilers stop at ~115 characters here, even with Windows long paths on. Move the folder to a shorter path such as C:\llapis.' }
 
 # --- GPU and driver ---------------------------------------------------------
 Section 'NVIDIA GPU and driver'

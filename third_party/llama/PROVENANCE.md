@@ -13,11 +13,11 @@ pinned SHA to re-fetch: `git clone` then `cmake` is the whole build, and it need
 | Commit | `050ee92d04c2e1f639025786dea701c70e7d4204` |
 | Tag | `b9821` |
 | License | MIT -- see `LICENSE` here and `THIRD_PARTY_LICENSES.txt` at the repo root |
-| Generated | 2026-11-06 02:42 UTC |
+| Generated | 2026-11-06 16:09 UTC |
 
 ## The boundary, in one line
 
-**LLapis owns 71 files of 1465.** Everything else is upstream at the pin, unmodified.
+**LLapis owns 71 files of 867.** Everything else is upstream at the pin, unmodified.
 
 | | files |
 |---|---:|
@@ -25,7 +25,8 @@ pinned SHA to re-fetch: `git clone` then `cmake` is the whole build, and it need
 | modified by LLapis, carrying logic | **50** |
 | modified by LLapis, generated output of a config change | 16 |
 | deleted by LLapis (unreachable for this vertical) | 1490 |
-| inherited untouched | 1394 |
+| deleted by LLapis (web UI source, never compiled) | 598 |
+| inherited untouched | 796 |
 
 Since **D-008** (F1) there is no `git pull` from upstream: the inherited files are frozen at the
 pin. They are not "kept current" -- they are simply not ours.
@@ -288,6 +289,16 @@ passed the golden transcript.
 - `.github/actions/get-tag-name/` -- 1 files
 - `.github/actions/ccache-clear/` -- 1 files
 - `.diff/` -- 1 files
+
+## Web UI source (deleted, never compiled)
+
+598 files of upstream's `tools/ui/` npm project: Svelte source, tests, Storybook, npm
+configuration. The build embeds the prebuilt `tools/ui/dist` and never runs npm
+(`LLAMA_BUILD_UI=OFF`), so removing them changes no byte of the product. Their paths reached
+179 characters, which broke a `git clone` into a deep folder on a Windows without long
+paths. What remains of `tools/ui/` is what the build reads: `CMakeLists.txt`, `embed.cpp`,
+`sources.cmake` and `dist/`. How the shipped bundle was built from upstream at the pin is
+in the repository's `provenance/` directory.
 
 ## Not absorbed (not a deletion)
 
