@@ -35,9 +35,8 @@ cd C:\llapis                        # or wherever the extracted folder is
 Windows may warn the first time that it "protected your PC" from an unrecognised app:
 the binaries are not code-signed. **More info → Run anyway** lets them run.
 
-Building from source instead is described under [Build from source](#build-from-source);
-the commands are the same except that the server lives in `build-cuda\Release\`
-instead of `bin\`.
+Developers who want to compile it themselves: see [Build from source](#build-from-source),
+near the end. Nobody else needs to.
 
 In the rest of this file, `llapis <verb>` is short for `.\llapis.cmd <verb>`, run
 from the LLapis folder.
@@ -84,8 +83,8 @@ worked, with the output of `.\build-check.cmd` attached.
 ## Requirements
 
 Verified on the reference machine. Anything materially different is untested, not
-unsupported — but you are the first to try it. The release zip needs only the first
-five rows; the rest are for [building from source](#build-from-source).
+unsupported — but you are the first to try it. This is all the release zip needs;
+[building from source](#build-from-source) needs more, listed there.
 
 | | Reference machine | Notes |
 |---|---|---|
@@ -94,11 +93,6 @@ five rows; the rest are for [building from source](#build-from-source).
 | Driver | 592.00 | one that supports CUDA 13: the R580 family or newer |
 | RAM | 16 GB (15.2 GiB usable) | this is the binding constraint, see below |
 | Disk | ~21 GB for `speed`, ~48 GB for `quality` | see the breakdown below |
-| CUDA | Toolkit 13.3 (`nvcc` 13.3.33) | source build only; `CUDA_PATH` must be set. The release ships the runtime DLLs it needs |
-| Compiler | Visual Studio 2022 (v17), C++ toolset | source build only; Build Tools alone are enough |
-| CMake | 3.24+ | source build only; Visual Studio 2022's bundled CMake qualifies |
-| Git | Git for Windows | source build only, to clone this repository |
-| Node / npm | **not required** | the web UI is prebuilt, in the release and in `third_party/llama/tools/ui/dist` |
 
 **On RAM.** The IQ2 cold tier is a ~9.3 GiB file and the runtime keeps the routed
 working set resident in RAM. On a 16 GB machine that fits with the arena partly
@@ -111,41 +105,13 @@ paging other applications out. `LLAPIS_PREFLIGHT_RAM=0` skips the check.
 
 **On which GPUs work.** CUDA 13 dropped Maxwell, Pascal and Volta, so the pinned
 toolkit cannot generate code for anything below compute capability **7.5**
-(Turing, the RTX 20 series). A GTX 10-series card will not build against it at
-any architecture setting — this is the toolkit's limit, not LLapis's. Check yours
+(Turing, the RTX 20 series). A GTX 10-series card cannot run LLapis: the release has
+no code for it and the toolkit cannot build any — the toolkit's limit, not LLapis's. Check yours
 first, before downloading anything:
 
 ```powershell
 nvidia-smi --query-gpu=name,compute_cap --format=csv
 ```
-
-**The architecture of your card is detected.** Without `-DCMAKE_CUDA_ARCHITECTURES`
-the build compiles for the GPU in the machine it runs on (CMake's `native`), whatever
-its generation, the CUDA kernels of the runtime and of llama.cpp alike. Pass the
-architecture only to build here for a *different* machine's GPU — the number is its
-compute capability without the dot:
-
-```powershell
-cmake -S . -B build-cuda -G "Visual Studio 17 2022" -A x64 -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=86-real
-```
-
-75 = Turing (RTX 20), 86 = Ampere (RTX 30), 89 = Ada (RTX 40), 120 = Blackwell
-(RTX 50). Getting the number wrong does not fail the build; it produces a binary
-that refuses to run on your device. A build meant to run on other machines also wants
-`-DGGML_NATIVE=OFF -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON`: the CPU code is
-otherwise compiled for the build machine's processor, and one with AVX-512 makes a
-binary that crashes on a CPU without it.
-
-**When you pass an architecture, the `-real` suffix is deliberate.** Without it, nvcc embeds PTX alongside the
-machine code — an intermediate form kept so that a *future* GPU, one whose
-machine code is not in the binary, can JIT-compile the kernels at load time. You
-are compiling for the card in front of you, so that never happens here, and it is
-not free: measured, the PTX is **34.7% of `ggml-cuda.dll`** — 29.2 MB down to
-19.1 MB — for **no change in build time** (4.2 → 4.1 min, within noise) and **no
-change in output** (the golden transcript reproduces character for character).
-
-Drop the suffix if you intend to build here and run the binaries on a machine
-with a different GPU without rebuilding. That is the only thing it buys.
 
 **On VRAM.** 8 GB is what the expert-cache sizing was designed and measured
 against. More VRAM means more resident experts and a higher hit rate; the runtime
@@ -161,111 +127,12 @@ small machine. RAM is: see above.
 **On disk.** The model files you download are 10.5 GB for `speed` (IQ2 + drafter) or 27.5 GB
 for `quality` (those plus the Q4 source); the vision projector adds 1.2 GB. On top of that,
 `prepare` derives 8.8 GB of artifacts for `speed` or 19.6 GB for `quality` (see the table in
-[Models](#models)). Add the build tree (~1 GB) and the repository itself (~0.1 GB) and you get
-the figures above. All sizes here are measured, in GB of 10⁹ bytes.
+[Models](#models)). Add the program — ~1 GB extracted, about the same for a source build's
+tree and repository — and you get the figures above. All sizes here are measured, in GB of 10⁹ bytes.
 
 **Install path.** Any folder works for the release zip, including one with spaces in
 its name: every command in this file was run from one. A source build has one limit,
 under [Build from source](#build-from-source).
-
----
-
-## Build from source
-
-Only if you want to build LLapis yourself: the release zip (see [Quick start](#quick-start))
-is the same program, already built. Building needs the CUDA Toolkit, Visual Studio 2022
-and CMake (see [Requirements](#requirements)); `.\build-check.cmd -Build` checks for them
-and does the steps below in one go.
-
-### 1. Clone
-
-```powershell
-git clone https://github.com/GiukK/llapis
-```
-
-**Folder depth.** Keep the checkout path within about 110 characters, as `C:\llapis`
-or `%USERPROFILE%\llapis` easily are; `build-check` warns above that. From about 115
-characters the build fails, because the CUDA and MSVC compilers do not support
-long paths: enabling Windows long paths does not help.
-
-### 2. Configure
-
-```powershell
-cmake -S . -B build-cuda -G "Visual Studio 17 2022" -A x64 -DGGML_CUDA=ON
-```
-
-The GPU's architecture is detected (see [Requirements](#requirements)); pass
-`-DCMAKE_CUDA_ARCHITECTURES` only to build for a different card than this machine's.
-
-Not sure the machine has everything? Run `.\build-check.cmd` first: it checks the GPU
-and its driver, the CUDA toolkit, Visual Studio's C++ tools and CUDA integration,
-CMake, the CPU, RAM, disk and the folder depth, and says what is missing and where to get
-it. `.\build-check.cmd -Build` then configures, builds and runs the tests, and checks
-that the CUDA code was compiled for this GPU; once the models are in place and
-`llapis setup` has run, `.\build-check.cmd -Smoke` starts the server and asks it one
-question.
-
-If CMake cannot find the CUDA toolkit, add
-`-DCUDAToolkit_ROOT="$env:CUDA_PATH"` — with **forward slashes**: backslashes in a
-`-D` value are escape sequences to CMake, and `...\v13.3` in particular is not a
-valid one.
-
-There is no fetch step and no patch step. llama.cpp is already here, in
-`third_party/llama`, with the LLapis changes applied as ordinary source — see
-[`third_party/llama/PROVENANCE.md`](third_party/llama/PROVENANCE.md) for the
-upstream commit it came from and the list of what we changed.
-
-### 3. Build — offline, no npm, no node
-
-```powershell
-cmake --build build-cuda --config Release
-```
-
-If that says `cmake` is not recognised, you are not missing anything: Visual
-Studio installs its own CMake with "Desktop development with C++" and does not
-put it on the PATH. Look under
-`C:\Program Files\Microsoft Visual Studio\2022\<edition>\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin`,
-or run from "x64 Native Tools Command Prompt for VS 2022".
-
-No `--target`: the build produces `moert-server.exe` and the unit tests (14, run
-with `ctest -C Release` from `build-cuda`) together, and restricting it to one target
-has been observed not to rebuild the backend DLLs after their sources changed. The
-DLLs the server needs (llama.cpp's and the CUDA runtime's) are copied next to
-`build-cuda\Release\moert-server.exe` at the end of the build, so it runs on its own.
-
-Nothing in this step reaches the network. The web UI is not compiled: it is a
-prebuilt bundle in `third_party/llama/tools/ui/dist`, which upstream's
-`ui-assets.cmake` takes with priority over its npm and Hugging Face download
-paths, so those paths are unreachable rather than merely switched off. Because
-the UI source is never compiled here, the diff that produced the bundle is kept
-separately in `provenance/`, which no script applies. See
-[`provenance/README.md`](provenance/README.md).
-
-### 4. Models
-
-See [Models](#models) below — download two files (three for `quality`), put each in its folder.
-
-### 5. Choose the runtime
-
-```powershell
-.\llapis.cmd setup
-```
-
-Asks two things: `quality` or `speed`, and a VRAM budget. Writes one file,
-`llapis-user.json`. That is the whole configuration. Without a console to answer in
-(a script, an agent), give the two answers as flags:
-`.\llapis.cmd setup -Runtime quality -VramBudget 0` (`0` = Max, all free VRAM).
-
-The VRAM budget is what LLapis itself may occupy, out of what is free when the
-server starts: VRAM other applications hold is not charged to it.
-
-`.\llapis.cmd`, not `llapis.ps1`, for every command in this file. The `.cmd` is
-not decoration: a fresh Windows account runs PowerShell under the `Restricted`
-policy, where invoking a `.ps1` directly fails with "running scripts is disabled
-on this system" — and a `.ps1` extracted from a downloaded zip is blocked even
-under `RemoteSigned`. The wrapper runs the same script with
-`-ExecutionPolicy Bypass` for that one call, so installing LLapis never asks you
-to change a system-wide setting.
 
 ---
 
@@ -361,6 +228,30 @@ Nothing is remembered between sessions. Only a fraction of the experts fit in
 VRAM, and which fraction is right depends on what you ask: every session starts
 with an empty expert cache and fills it from the first prompt; by the end of that
 prompt the cache is full, so the first answer runs at about the speed of the rest.
+
+---
+
+## Setup
+
+```powershell
+.\llapis.cmd setup
+```
+
+Asks two things: `quality` or `speed`, and a VRAM budget. Writes one file,
+`llapis-user.json`. That is the whole configuration. Without a console to answer in
+(a script, an agent), give the two answers as flags:
+`.\llapis.cmd setup -Runtime quality -VramBudget 0` (`0` = Max, all free VRAM).
+
+The VRAM budget is what LLapis itself may occupy, out of what is free when the
+server starts: VRAM other applications hold is not charged to it.
+
+`.\llapis.cmd`, not `llapis.ps1`, for every command in this file. The `.cmd` is
+not decoration: a fresh Windows account runs PowerShell under the `Restricted`
+policy, where invoking a `.ps1` directly fails with "running scripts is disabled
+on this system" — and a `.ps1` extracted from a downloaded zip is blocked even
+under `RemoteSigned`. The wrapper runs the same script with
+`-ExecutionPolicy Bypass` for that one call, so installing LLapis never asks you
+to change a system-wide setting.
 
 ---
 
@@ -717,6 +608,14 @@ Remove-Item -Recurse -Force .\logs\*
   was removed rather than kept as a quiet exception.
 - **A first turn is slow.** The model streams from disk; steady-state speed
   arrives once the expert cache is warm.
+- **Every prompt pays a fixed cost before the first token**, about 0.6–1 s on the
+  reference machine: the experts the prompt needs are staged into VRAM from the
+  RAM copy, however short the prompt. That is most of LLapis' time to first token.
+- **If the whole model fits in your VRAM, LLapis is not the faster choice.** It is
+  built for the case where it does not fit. Measured on an RTX 3090 (24 GB) with every
+  expert resident: generation on par with tuned llama.cpp, but the prompt read at about
+  half the speed and the first token about twice as late, because the prompt still
+  takes the staged path above.
 - **16 GB of RAM is the floor, and LLapis keeps its 7.7 GiB expert arena in RAM
   while it runs.** The arena is the expert store mapped read-only, so it lives in
   Windows' file cache, not in LLapis' own committed memory. It asks Windows for a minimum working set of arena + 0.5 GiB,
@@ -728,6 +627,123 @@ Remove-Item -Recurse -Force .\logs\*
   pages of the experts currently held in VRAM are dropped from RAM (~1.1 GiB in
   `speed` at a 5 GiB budget, ~0.25 GiB in `quality`) and faulted back in on a
   worker thread when those experts go cold again.
+
+---
+
+## Build from source
+
+For development, or to run binaries you compiled yourself. Everyone else: the release zip
+(see [Quick start](#quick-start)) is the same program, already built. Building needs the CUDA Toolkit, Visual Studio 2022
+and CMake (listed below); `.\build-check.cmd -Build` checks for them
+and does the steps below in one go.
+
+### What it needs
+
+| | Reference machine | Notes |
+|---|---|---|
+| CUDA | Toolkit 13.3 (`nvcc` 13.3.33) | `CUDA_PATH` must be set. Install it **after** Visual Studio, so that it adds its Visual Studio integration; in a custom install, untick the driver if you want to keep yours |
+| Compiler | Visual Studio 2022 (v17), C++ toolset | the Build Tools with "Desktop development with C++" are enough |
+| CMake | 3.24+ | Visual Studio 2022's bundled CMake qualifies |
+| Git | Git for Windows | to clone this repository |
+| Node / npm | **not required** | the web UI is prebuilt, in `third_party/llama/tools/ui/dist` |
+
+### 1. Clone
+
+```powershell
+git clone https://github.com/GiukK/llapis
+```
+
+**Folder depth.** Keep the checkout path within about 110 characters, as `C:\llapis`
+or `%USERPROFILE%\llapis` easily are; `build-check` warns above that. From about 115
+characters the build fails, because the CUDA and MSVC compilers do not support
+long paths: enabling Windows long paths does not help.
+
+### 2. Configure
+
+```powershell
+cmake -S . -B build-cuda -G "Visual Studio 17 2022" -A x64 -DGGML_CUDA=ON
+```
+
+The GPU's architecture is detected (see below); pass
+`-DCMAKE_CUDA_ARCHITECTURES` only to build for a different card than this machine's.
+
+Not sure the machine has everything? Run `.\build-check.cmd` first: it checks the GPU
+and its driver, the CUDA toolkit, Visual Studio's C++ tools and CUDA integration,
+CMake, the CPU, RAM, disk and the folder depth, and says what is missing and where to get
+it. `.\build-check.cmd -Build` then configures, builds and runs the tests, and checks
+that the CUDA code was compiled for this GPU; once the models are in place and
+`llapis setup` has run, `.\build-check.cmd -Smoke` starts the server and asks it one
+question.
+
+If CMake cannot find the CUDA toolkit, add
+`-DCUDAToolkit_ROOT="$env:CUDA_PATH"` — with **forward slashes**: backslashes in a
+`-D` value are escape sequences to CMake, and `...\v13.3` in particular is not a
+valid one.
+
+There is no fetch step and no patch step. llama.cpp is already here, in
+`third_party/llama`, with the LLapis changes applied as ordinary source — see
+[`third_party/llama/PROVENANCE.md`](third_party/llama/PROVENANCE.md) for the
+upstream commit it came from and the list of what we changed.
+
+**The architecture of your card is detected.** Without `-DCMAKE_CUDA_ARCHITECTURES`
+the build compiles for the GPU in the machine it runs on (CMake's `native`), whatever
+its generation, the CUDA kernels of the runtime and of llama.cpp alike. Pass the
+architecture only to build here for a *different* machine's GPU — the number is its
+compute capability without the dot:
+
+```powershell
+cmake -S . -B build-cuda -G "Visual Studio 17 2022" -A x64 -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=86-real
+```
+
+75 = Turing (RTX 20), 86 = Ampere (RTX 30), 89 = Ada (RTX 40), 120 = Blackwell
+(RTX 50). Getting the number wrong does not fail the build; it produces a binary
+that refuses to run on your device. A build meant to run on other machines also wants
+`-DGGML_NATIVE=OFF -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON`: the CPU code is
+otherwise compiled for the build machine's processor, and one with AVX-512 makes a
+binary that crashes on a CPU without it.
+
+**When you pass an architecture, the `-real` suffix is deliberate.** Without it, nvcc embeds PTX alongside the
+machine code — an intermediate form kept so that a *future* GPU, one whose
+machine code is not in the binary, can JIT-compile the kernels at load time. You
+are compiling for the card in front of you, so that never happens here, and it is
+not free: measured, the PTX is **34.7% of `ggml-cuda.dll`** — 29.2 MB down to
+19.1 MB — for **no change in build time** (4.2 → 4.1 min, within noise) and **no
+change in output** (the golden transcript reproduces character for character).
+
+Drop the suffix if you intend to build here and run the binaries on a machine
+with a different GPU without rebuilding. That is the only thing it buys.
+
+### 3. Build — offline, no npm, no node
+
+```powershell
+cmake --build build-cuda --config Release
+```
+
+If that says `cmake` is not recognised, you are not missing anything: Visual
+Studio installs its own CMake with "Desktop development with C++" and does not
+put it on the PATH. Look under
+`C:\Program Files\Microsoft Visual Studio\2022\<edition>\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin`,
+or run from "x64 Native Tools Command Prompt for VS 2022".
+
+No `--target`: the build produces `moert-server.exe` and the unit tests (14, run
+with `ctest -C Release` from `build-cuda`) together, and restricting it to one target
+has been observed not to rebuild the backend DLLs after their sources changed. The
+DLLs the server needs (llama.cpp's and the CUDA runtime's) are copied next to
+`build-cuda\Release\moert-server.exe` at the end of the build, so it runs on its own.
+
+Nothing in this step reaches the network. The web UI is not compiled: it is a
+prebuilt bundle in `third_party/llama/tools/ui/dist`, which upstream's
+`ui-assets.cmake` takes with priority over its npm and Hugging Face download
+paths, so those paths are unreachable rather than merely switched off. Because
+the UI source is never compiled here, the diff that produced the bundle is kept
+separately in `provenance/`, which no script applies. See
+[`provenance/README.md`](provenance/README.md).
+
+### 4. Models and setup
+
+The same as for the release: [Models](#models), then [Setup](#setup). Every command in
+this file works from the repository folder; the server is `build-cuda\Release\moert-server.exe`
+where the release has `bin\moert-server.exe`.
 
 ---
 

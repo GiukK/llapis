@@ -429,7 +429,22 @@ function Invoke-LlapisServe {
       # optional browser (secondary): -Open forces; otherwise ask once (normal interactive)
       $doOpen = [bool]$Open
       if (-not $doOpen -and $Interactive) {
-        $ans = Read-Host "Open browser? [y/N]"
+        # Not Read-Host: it blocks until Enter, so a `llapis stop` from another terminal left this
+        # window waiting on the question with the server already gone (rc3 report, R1). Poll the
+        # keyboard and the router together; a stop ends the question.
+        Write-Host "Open browser? [y/N]: " -NoNewline
+        $ans = ''
+        try {
+          while (-not $router.HasExited) {
+            if ([Console]::KeyAvailable) {
+              $k = [Console]::ReadKey($true)
+              if ($k.Key -eq 'Enter') { break }
+              if ($k.Key -eq 'Backspace') { if ($ans.Length) { $ans = $ans.Substring(0, $ans.Length - 1); Write-Host "`b `b" -NoNewline } }
+              elseif ($k.KeyChar -ne [char]0) { $ans += $k.KeyChar; Write-Host $k.KeyChar -NoNewline }
+            } else { Start-Sleep -Milliseconds 100 }
+          }
+        } catch { $ans = Read-Host }   # no console keyboard after all: the old blocking read
+        Write-Host ""
         if ($ans -match '^[yY]') { $doOpen = $true }
       }
       if ($doOpen) { Start-Process $base | Out-Null }

@@ -460,7 +460,7 @@ static void vkv_init_from_env() {
         if (budget > 0 && free_mb > 0 && mem_partition::wddm_local(&wddm_budget, &ours) && ours >= 0) {
             const long long keep = std::max(250LL, free_mb + ours - budget);
             std::fprintf(stderr, "[moert-server] VRAM budget %lld MiB: %lld MiB ours + %lld free now -> keep %lld MiB free "
-                                 "(launcher estimate %lld)\n", budget, ours, free_mb, keep, g_vkv_keep_post);
+                                 "(enforced; the launcher's nvidia-smi estimate was %lld)\n", budget, ours, free_mb, keep, g_vkv_keep_post);
             g_vkv_keep_post = keep;
         }
     }
