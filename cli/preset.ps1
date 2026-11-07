@@ -303,6 +303,8 @@ if ($NoExpertAlloc)    { $env:MOE_DUAL_NO_EXPERT_ALLOC = '1' }
 $script:KeepFreeMib = Resolve-KeepFreeMiB
 if ($script:KeepFreeMib -ne $script:VkvKeepMib) {
   $env:MOE_DUAL_VKV_KEEP_POST_MIB = "$($script:KeepFreeMib)"
+  # the runtime re-derives the keep-free from the budget in its own free-VRAM units (server_main.cpp)
+  $env:MOE_DUAL_VRAM_BUDGET_MIB = "$($script:VramBudgetMib)"
   $tot = Get-TotalVramMiB
   Write-Host ("[llapis] VRAM budget: up to {0} MiB for LLapis ({1} MiB card) -> keeping {2} MiB free; the expert cache is sized to what is left and re-fitted at every context change. -VramBudget 0 for MAX." -f $script:VramBudgetMib, $tot, $script:KeepFreeMib) -ForegroundColor Cyan
 }

@@ -448,6 +448,22 @@ static void vkv_init_from_env() {
     // MOE_DUAL_* and then sets its own, so the canonical names already survive every hop.
     if (const char * v = std::getenv("MOE_DUAL_VKV"); v && v[0] == '1') g_vkv_enabled = true;
     if (const char * v = std::getenv("MOE_DUAL_VKV_KEEP_POST_MIB"); v && v[0]) g_vkv_keep_post = std::atoll(v);
+    // -VramBudget, re-derived in the units the refit obeys. The launcher converts the budget to a
+    // keep-free with nvidia-smi's free VRAM, but the refit measures free with the device query, and on
+    // WDDM the two differ by gigabytes when other applications hold VRAM: an 8000 MiB budget ended at
+    // 11.2 GiB used (RTX 3090 rc2 report, N4). free + OUR usage is what we could hold at most, so
+    // keep = free + usage - budget caps our usage at the budget wherever this runs.
+    if (const char * v = std::getenv("MOE_DUAL_VRAM_BUDGET_MIB"); v && v[0]) {
+        const long long budget  = std::atoll(v);
+        const long long free_mb = moe_dual::pool_free_mib();
+        long long wddm_budget = 0, ours = -1;
+        if (budget > 0 && free_mb > 0 && mem_partition::wddm_local(&wddm_budget, &ours) && ours >= 0) {
+            const long long keep = std::max(250LL, free_mb + ours - budget);
+            std::fprintf(stderr, "[moert-server] VRAM budget %lld MiB: %lld MiB ours + %lld free now -> keep %lld MiB free "
+                                 "(launcher estimate %lld)\n", budget, ours, free_mb, keep, g_vkv_keep_post);
+            g_vkv_keep_post = keep;
+        }
+    }
     ///: arms the measured boot-K refit for server_main's own on-prompt-end restore
     // (below) — the one call site proven safe for it (quiescent, q4stream guaranteed off there).
     // The graph hook has its own SEPARATE lazy boot-deferred restore that intentionally stays on

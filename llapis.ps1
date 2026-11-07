@@ -175,8 +175,10 @@ function Invoke-LlapisStatus {
     Write-Host ("  cold arena: {0} GiB reserved, {1} GiB resident" -f (fmtGiB $r.arena_committed), (fmtGiB $r.arena_resident))
     Write-Host ("  hit rate : {0:p0} of expert compute served hot   (cache {1:p0} full)" -f $tel.hit_rate, $tel.occupancy)
     $gen = if ($tel.window) { [double]$tel.window.gen_tok_per_s } else { 0 }
-    if ($gen -gt 0) { Write-Host ("  speed    : {0} tok/s, generating now" -f ([Math]::Round($gen, 1)).ToString([Globalization.CultureInfo]::InvariantCulture)) }
-    else { Write-Host "  speed    : idle (each API response carries its own in timings.predicted_per_second)" }
+    # A rolling window over the last decoded tokens, not the slot state: it lags a turn's start and end
+    # and averages over pauses (rc2 report, N3), so it is labelled as what it is.
+    if ($gen -gt 0) { Write-Host ("  speed    : {0} tok/s over the most recent tokens (exact per request: timings.predicted_per_second)" -f ([Math]::Round($gen, 1)).ToString([Globalization.CultureInfo]::InvariantCulture)) }
+    else { Write-Host "  speed    : no recent tokens (exact per request: timings.predicted_per_second)" }
   }
   Write-Host ""
   Write-Host ("  API : {0}/v1   UI : {0}" -f $base)
@@ -350,6 +352,9 @@ function Invoke-LlapisStop {
   # the caller cares about, and it is not the same instant as the process exiting.
   for ($i = 0; $i -lt 40; $i++) {
     if ((Get-PortOwnerPid $port) -eq 0) {
+      # ...but a process killed with ~11 GiB of VRAM stays listed for 1-3 s while Windows tears it
+      # down, and a caller that checks right after `stop` saw it still there (rc2 report, N6).
+      foreach ($p in @($proc) + $children) { try { $null = $p.WaitForExit(10000) } catch { } }
       Write-Host "LLapis stopped (port $port released)." -ForegroundColor Green
       return 0
     }

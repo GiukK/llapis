@@ -122,11 +122,17 @@ foreach ($d in 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll', 'vcomp1
   cpu        = 'x86-64 with AVX2, FMA, F16C'
 } | ConvertTo-Json | Out-File -Encoding ascii (Join-Path $pb 'llapis-build.json')
 
+# Windows' own bsdtar, by full path: from a Git Bash shell the GNU tar of Git comes first in PATH, reads
+# "C:" in a path as a remote host and, given -a, writes a plain tar under a .zip name (both seen).
+$tar = Join-Path $env:SystemRoot 'System32\tar.exe'
+if (-not (Test-Path $tar)) { Die "Windows tar not found: $tar" }
+
 # The scripts and data the runtime reads, from git (exactly what is committed, nothing local).
 $tmpTar = Join-Path $OutDir "$name.src.tar"
 git -C $Root archive --format=tar -o $tmpTar HEAD llapis.cmd llapis.ps1 build-check.cmd cli assets models LICENSE THIRD_PARTY_LICENSES.txt README.md
 if ($LASTEXITCODE) { Die 'git archive failed' }
-tar -x -f $tmpTar -C $P
+& $tar -x -f $tmpTar -C $P
+if ($LASTEXITCODE -or -not (Test-Path (Join-Path $P 'llapis.cmd'))) { Die 'extracting the scripts failed' }
 Remove-Item $tmpTar
 Remove-Item (Join-Path $P 'cli\package.ps1') -ErrorAction SilentlyContinue   # a build tool, meaningless without the sources
 
@@ -157,7 +163,7 @@ Step 'Zip'
 $zip = Join-Path $OutDir "$name.zip"
 if (Test-Path $zip) { Remove-Item $zip }
 Push-Location $OutDir
-tar -a -c -f "$name.zip" $name
+& $tar -a -c -f "$name.zip" $name
 $rc = $LASTEXITCODE
 Pop-Location
 if ($rc) { Die 'zip failed' }

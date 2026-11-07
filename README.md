@@ -50,7 +50,7 @@ The release is compiled for every consumer generation CUDA 13 supports, and
 | GPU | Code in the release | Tested |
 |---|---|---|
 | RTX 40 series (Ada, sm_89) | machine code | **yes** — the reference machine, RTX 4070 Laptop 8 GB |
-| RTX 30 series (Ampere, sm_86) | machine code | not yet |
+| RTX 30 series (Ampere, sm_86) | machine code | **yes** — RTX 3090 24 GB, by an external tester |
 | RTX 20 / GTX 16 series (Turing, sm_75) | machine code | not yet |
 | RTX 50 series (Blackwell, sm_120) | machine code + PTX | not yet |
 | a later NVIDIA GPU | PTX, compiled by the driver at the first start (minutes, once) | no |
@@ -647,6 +647,17 @@ empty. This one refuses to start rather than degrade: without the drafter the
 prompt is prefilled token by token instead of streamed, measured at 74.5 against
 1275 tok/s on a 4752-token prompt. That is roughly a minute of extra TTFT, and
 applying it silently would look like the product is simply slow.
+
+**`model is not loaded` after the model process crashed** — the server stays up and
+reports the crash (`llapis status` says `unloaded`). Load the model again from the
+web UI, or from PowerShell:
+
+```powershell
+Invoke-RestMethod -Method Post http://127.0.0.1:8077/models/load -ContentType application/json -Body '{"model":"llapis"}'
+```
+
+Right after a crash the load is refused for about 15 s, and the error says when to
+retry. Please open an issue with the log from `logs\`.
 
 **Port 8077 already in use** — `llapis stop`, or `llapis serve -Port 8078`.
 

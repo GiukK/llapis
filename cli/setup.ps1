@@ -390,7 +390,7 @@ function Invoke-LlapisSetupFromFlags([string]$mode, [int]$vramBudgetMib) {
   [void](Write-LlapisSetup $mode $vramBudgetMib)
   Write-Host ""
   Write-Host ("Saved: runtime {0}, VRAM {1}." -f $mode, $(if ($vramBudgetMib -gt 0) { "up to $vramBudgetMib MiB" } else { 'Max (all free VRAM)' }))
-  Write-Host "You can now run:  llapis chat   |   llapis serve"
+  Write-Host "You can now run:  .\llapis.cmd chat   |   .\llapis.cmd serve"
   return $true
 }
 
@@ -452,6 +452,6 @@ function Invoke-LlapisWizard {
 
   Write-Host ""
   Write-Host "Saved."
-  Write-Host "You can now run:  llapis chat   |   llapis serve"
+  Write-Host "You can now run:  .\llapis.cmd chat   |   .\llapis.cmd serve"
   return $s
 }

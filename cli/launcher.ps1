@@ -148,6 +148,11 @@ $TraceMode   = [bool]$Trace
 # raw firehose goes to the log file only). -Trace = the pre-C5 -Debug (full raw firehose).
 $LogLevel = if ($TraceMode) { 'trace' } elseif ($DebugMode) { 'debug' } elseif ($VerboseMode) { 'verbose' } else { 'normal' }
 if ($TraceMode) { $DebugMode = $true }   # -Trace implies every -Debug unlock (advanced flags, raw bench dumps)
+# The levels above are ours; PowerShell's own debug/verbose streams stay off. In Windows PowerShell
+# 5.1 the common -Debug sets $DebugPreference = 'Inquire', so the first cmdlet that writes debug
+# output (Add-Type echoes the C# source of the kill-on-close job) asked "Continue? [Y/N]" and the
+# server never loaded in a console; without one it threw instead (RTX 3090 rc2 report, N1/N2/N10).
+$DebugPreference = 'SilentlyContinue'; $VerbosePreference = 'SilentlyContinue'
 
 # ps1-side phase lines (C5): the wrapper's own steps in the same voice as the C++ llapis_phase
 # lines (which carry a [+  12.3s] process-relative timestamp; the wrapper's steps are instant).
