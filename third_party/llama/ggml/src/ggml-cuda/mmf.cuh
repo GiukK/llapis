@@ -766,6 +766,7 @@ static void mul_mat_f_switch_cols_per_block(
                 stride_col_id, stride_row_id, nchannels_x, nchannels_y,  nchannels_dst, stride_channel_x, stride_channel_y, stride_channel_dst,
                 nsamples_x, nsamples_dst, stride_sample_x, stride_sample_y, stride_sample_dst, stream, ids_data);
         } break;
+#ifndef LLAPIS_CUDA_SLIM   // instances 5..16 are not compiled; ggml_cuda_should_use_mmf sends them to llapis-gemm
         case  5: {
             mul_mat_f_cuda<T,  rows_per_block, 5>(x, y, ids, dst, ncols_x, nrows_x, ncols_dst, stride_row, stride_col_y, stride_col_dst,
                 stride_col_id, stride_row_id, nchannels_x, nchannels_y,  nchannels_dst, stride_channel_x, stride_channel_y, stride_channel_dst,
@@ -826,6 +827,7 @@ static void mul_mat_f_switch_cols_per_block(
                 stride_col_id, stride_row_id, nchannels_x, nchannels_y,  nchannels_dst, stride_channel_x, stride_channel_y, stride_channel_dst,
                 nsamples_x, nsamples_dst, stride_sample_x, stride_sample_y, stride_sample_dst, stream, ids_data);
         } break;
+#endif // LLAPIS_CUDA_SLIM
         default: {
             GGML_ABORT("fatal error");
         } break;
@@ -849,12 +851,14 @@ static void mul_mat_f_switch_rows_per_block(
                 stride_col_id, stride_row_id, nchannels_x, nchannels_y, nchannels_dst, stride_channel_x, stride_channel_y, stride_channel_dst,
                 nsamples_x, nsamples_dst, stride_sample_x, stride_sample_y, stride_sample_dst, stream, ids_data);
         } break;
+#ifndef LLAPIS_CUDA_SLIM   // AMD only
         case MMF_ROWS_PER_BLOCK_CDNA: {
             mul_mat_f_switch_cols_per_block<T, MMF_ROWS_PER_BLOCK_CDNA>(
                 x, y, ids, dst, ncols_x, nrows_x, ncols_dst, stride_row, stride_col_y, stride_col_dst,
                 stride_col_id, stride_row_id, nchannels_x, nchannels_y, nchannels_dst, stride_channel_x, stride_channel_y, stride_channel_dst,
                 nsamples_x, nsamples_dst, stride_sample_x, stride_sample_y, stride_sample_dst, stream, ids_data);
         } break;
+#endif // LLAPIS_CUDA_SLIM
         default:
             GGML_ABORT("unsupported rows_per_block: %i", rows_per_block);
     }
@@ -870,7 +874,23 @@ static void mul_mat_f_switch_rows_per_block(
         const int64_t nsamples_dst, const int64_t stride_sample_x, const int64_t stride_sample_y, const int64_t stride_sample_dst, \
         cudaStream_t stream, const mmf_ids_data * ids_data);
 
-#if !defined(GGML_USE_MUSA)
+#if defined(LLAPIS_CUDA_SLIM)
+// LLapis slim build: only what an NVIDIA RTX card running this model can select. No BF16 weights
+// exist in the model files, MMF_ROWS_PER_BLOCK_CDNA is AMD's, and 5..16 columns go to llapis-gemm
+// (ggml_cuda_should_use_mmf). 8 kernels per architecture instead of 96.
+#define DECL_MMF_CASE_EXTERN(ncols_dst) \
+    extern DECL_MMF_CASE_HELPER(float, MMF_ROWS_PER_BLOCK, ncols_dst) \
+    extern DECL_MMF_CASE_HELPER(half2, MMF_ROWS_PER_BLOCK, ncols_dst)
+
+#define DECL_MMF_CASE(ncols_dst) \
+    DECL_MMF_CASE_HELPER(float, MMF_ROWS_PER_BLOCK, ncols_dst) \
+    DECL_MMF_CASE_HELPER(half2, MMF_ROWS_PER_BLOCK, ncols_dst)
+
+DECL_MMF_CASE_EXTERN(1);
+DECL_MMF_CASE_EXTERN(2);
+DECL_MMF_CASE_EXTERN(3);
+DECL_MMF_CASE_EXTERN(4);
+#elif !defined(GGML_USE_MUSA)
 #define DECL_MMF_CASE_EXTERN(ncols_dst) \
     extern DECL_MMF_CASE_HELPER(float, MMF_ROWS_PER_BLOCK, ncols_dst) \
     extern DECL_MMF_CASE_HELPER(half2, MMF_ROWS_PER_BLOCK, ncols_dst) \

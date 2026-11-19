@@ -5,21 +5,24 @@
 #
 # A user of the zip needs an NVIDIA driver and nothing else: no Git, no Visual Studio, no CUDA
 # Toolkit. So the binaries must run on ANY supported GPU and CPU, not the build machine's:
-#   - CUDA: machine code for every consumer generation CUDA 13 supports, plus PTX for the newest
-#     so a later GPU can compile it at its first start (see -Arch);
+#   - CUDA: machine code for every consumer generation CUDA 13 supports (see -Arch). No PTX: it
+#     was ~12% of ggml-cuda.dll for GPU generations that do not exist yet, and a new generation
+#     gets a release compiled and tested for it instead of a first start that compiles for minutes;
 #   - CPU: GGML_NATIVE=OFF with AVX2/FMA/F16C, the floor build-check already requires. A native
 #     build on a CPU with AVX-512 makes a binary that crashes on one without it.
 # It builds in build-release\ (never touches build-cuda\), runs the unit tests, checks with
 # cuobjdump that every architecture is really in ggml-cuda.dll, and writes
 #   <OutDir>\llapis-<version>-win-x64\   and   <OutDir>\llapis-<version>-win-x64.zip
-# The zip also carries the CUDA runtime DLLs (cudart, cublas, cublasLt) and the Visual C++ runtime
+# The zip also carries the CUDA runtime DLL (cudart; NOT cuBLAS: ggml-cuda delay-loads it and the
+# LLapis GEMM, ggml-cuda/llapis-gemm.cuh, takes every shape that reached it -- 428 MB -> ~55 MB) and the Visual C++ runtime
 # (msvcp140, vcruntime140, vcruntime140_1, vcomp140), both redistributable, and bin\llapis-build.json
 # which cli/gpu-support.ps1 reads to tell a user whether the package can run on their GPU.
 # ===========================================================================
 param(
-  # 75 = RTX 20 / GTX 16, 86 = RTX 30, 89 = RTX 40, 120 = RTX 50 (machine code); '120' without
-  # -real also embeds compute_120 PTX for GPUs newer than the list.
-  [string]$Arch = '75-real;86-real;89-real;120',
+  # 75 = RTX 20 / GTX 16, 86 = RTX 30, 89 = RTX 40, 120 = RTX 50 (machine code). An entry without
+  # -real (e.g. '120') also embeds its PTX, which a GPU newer than the list can JIT at its first
+  # start. 89 stays although Ada can load sm_86 code: mmvq's launch bounds differ per architecture.
+  [string]$Arch = '75-real;86-real;89-real;120-real',
   [string]$OutDir = 'dist',
   [switch]$SkipBuild
 )
@@ -95,7 +98,7 @@ Copy-Item (Join-Path $Rel 'moert-server.exe') $pb
 foreach ($d in 'ggml-base', 'ggml-cpu', 'ggml-cuda', 'ggml', 'llama', 'llama-common', 'llama-server-impl', 'mtmd') {
   Copy-Item (Join-Path $Bin "$d.dll") $pb
 }
-foreach ($d in 'cudart64_13.dll', 'cublas64_13.dll', 'cublasLt64_13.dll') {
+foreach ($d in 'cudart64_13.dll') {
   $s = Join-Path $env:CUDA_PATH "bin\x64\$d"; if (-not (Test-Path $s)) { $s = Join-Path $env:CUDA_PATH "bin\$d" }
   if (-not (Test-Path $s)) { Die "$d not found in the CUDA Toolkit" }
   Copy-Item $s $pb
@@ -145,13 +148,12 @@ Requirements: Windows 10/11 x64, an NVIDIA RTX 20 series or newer, a current NVI
 
   1. .\build-check.cmd                     checks this machine
   2. download the models into models\     (README.md, section "Models")
-  3. .\bin\moert-server.exe prepare
-  4. .\llapis.cmd setup
-  5. .\llapis.cmd serve -Open
+  3. .\llapis.cmd setup                   two questions, then it builds its own files (once, ~1 min)
+  4. .\llapis.cmd serve -Open
 
 GPU code included: machine code for sm_$($sass -join ', sm_')$(if ($ptx.Count) { "; PTX for compute_$($ptx -join ', compute_')" }).
 
-Third-party binaries in bin\: the NVIDIA CUDA runtime (cudart64_13, cublas64_13, cublasLt64_13),
+Third-party binaries in bin\: the NVIDIA CUDA runtime (cudart64_13),
 redistributed under the NVIDIA CUDA Toolkit End User License Agreement
 (https://docs.nvidia.com/cuda/eula/), and the Microsoft Visual C++ runtime (msvcp140, vcruntime140,
 vcruntime140_1, vcomp140), redistributed under the Visual Studio redistribution terms. They are

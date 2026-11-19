@@ -453,7 +453,7 @@ that it runs without the CUDA Toolkit or Visual Studio installed. They are
 redistributed unmodified, in binary form, under their publishers' terms, and are
 NOT covered by the LLapis MIT licence.
 
-  NVIDIA CUDA runtime 13.x     cudart64_13.dll, cublas64_13.dll, cublasLt64_13.dll
+  NVIDIA CUDA runtime 13.x     cudart64_13.dll
                                NVIDIA CUDA Toolkit End User License Agreement
                                (these files are among its redistributable
                                components)

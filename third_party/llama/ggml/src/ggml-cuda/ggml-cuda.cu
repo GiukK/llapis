@@ -19,6 +19,7 @@
 #include "ggml-cuda/conv2d-transpose.cuh"
 #include "ggml-cuda/convert.cuh"
 #include "ggml-cuda/llapis-probe.cuh"
+#include "ggml-cuda/llapis-gemm.cuh"
 #include "ggml-cuda/count-equal.cuh"
 #include "ggml-cuda/cpy.cuh"
 #include "ggml-cuda/cross-entropy-loss.cuh"
@@ -206,6 +207,13 @@ static int ggml_cuda_parse_id(char devName[]) {
 
 static ggml_cuda_device_info ggml_cuda_init() {
     ggml_cuda_device_info info = {};
+
+    // [llapis] CONTROL key. This function provably runs on every boot -- its own GGML_LOG_INFO is
+    // the first line of every serve log. So if this key is absent from a probe run, the probe
+    // plumbing is broken and NO conclusion may be drawn from the other keys being absent either.
+    // That is the §132 trap in its general form: a silent probe and "the code is never reached"
+    // look identical, and the second is the answer one is hoping for.
+    LLAPIS_PROBE_KEY("control: ggml_cuda_init ran (the probe is live)");
 
     cudaError_t err = cudaGetDeviceCount(&info.device_count);
     if (err != cudaSuccess) {
@@ -1682,6 +1690,17 @@ static void ggml_cuda_op_mul_mat_cublas(
     GGML_ASSERT(src1_ddf_i != nullptr);
     GGML_ASSERT(dst_dd_i   != nullptr);
 
+    // [llapis] F1-bis attribution: cuBLAS is 488 of the 559 MB this package ships, and findings 132
+    // said one op reaches it -- the MoE router gate, F32, prefill only. That was measured in August,
+    // before the elision, the two-stage head and the operator cut, so it is re-asked here rather
+    // than quoted. The key carries who and how wide; `ncols` is bucketed so a probe run prints a
+    // bounded number of lines instead of one per prompt length.
+    LLAPIS_PROBE_KEY("cublas mul_mat dst=%s src0=%s[%lld x %lld] src1=%s ncols%s",
+                     dst->name, ggml_type_name(src0->type),
+                     (long long) src0->ne[0], (long long) src0->ne[1],
+                     ggml_type_name(src1->type),
+                     src1_ncols <= 4 ? "<=4" : (src1_ncols <= 16 ? "<=16" : ">16"));
+
     const int64_t ne00 = src0->ne[0];
     const int64_t ne10 = src1->ne[0];
 
@@ -2412,6 +2431,13 @@ static void ggml_cuda_mul_mat_batched_cublas_impl(ggml_backend_cuda_context & ct
 static void ggml_cuda_mul_mat_batched_cublas(ggml_backend_cuda_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
     GGML_ASSERT(src0->type == GGML_TYPE_F16 || src0->type == GGML_TYPE_BF16 || src0->type == GGML_TYPE_F32);
 
+    // [llapis] F1-bis attribution, second destination: findings 132 counted ZERO batched calls.
+    // If this line ever appears, the single-matmul story is wrong and the 488 MB cannot be dropped
+    // by covering one shape.
+    LLAPIS_PROBE_KEY("cublas batched dst=%s src0=%s[%lld x %lld x %lld]",
+                     dst->name, ggml_type_name(src0->type),
+                     (long long) src0->ne[0], (long long) src0->ne[1], (long long) src0->ne[2]);
+
     switch (src0->type) {
         case GGML_TYPE_F32:
             ggml_cuda_mul_mat_batched_cublas_impl<GGML_TYPE_F32>(ctx, src0, src1, dst);
@@ -2679,6 +2705,9 @@ static void ggml_cuda_mul_mat(ggml_backend_cuda_context & ctx, const ggml_tensor
         ggml_cuda_mul_mat_vec_q(ctx, src0, src1, nullptr, dst);
     } else if (!split && use_mul_mat_q) {
         ggml_cuda_mul_mat_q(ctx, src0, src1, nullptr, dst);
+    } else if (!split && llapis_gemm_mul_mat(ctx, src0, src1, dst)) {
+        // LLapis: every shape below this line went to cuBLAS; our GEMM takes them so the
+        // release ships without the cuBLAS DLLs (llapis-gemm.cuh). LLAPIS_CUBLAS=1 restores it.
     } else if (!split && (use_batched_cublas_f16 || use_batched_cublas_bf16 || use_batched_cublas_f32)
         && !ggml_is_transposed(src0) && !ggml_is_transposed(src1) && src1->ne[2]*src1->ne[3] > 1) {
         // general KQ + KQV multi-batch without FlashAttention
@@ -5776,6 +5805,9 @@ static bool ggml_backend_cuda_device_supports_op_inner(ggml_backend_dev_t dev, c
         case GGML_OP_ARGSORT:
 #ifndef GGML_CUDA_USE_CUB
             return op->src[0]->ne[0] <= 1024;
+#elif defined(LLAPIS_NO_ARGSORT_CUB)
+            // slim build: no CUB radix sort (argsort.cuh); TOP_K goes through cub::DeviceTopK
+            return op->op == GGML_OP_TOP_K || op->src[0]->ne[0] <= 1024;
 #else
             return true;
 #endif

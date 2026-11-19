@@ -294,6 +294,21 @@ static constexpr __device__ int mmq_get_granularity_device(const int /*mmq_x*/) 
 }
 #endif // AMD_MFMA_AVAILABLE
 
+// LLapis slim build: which tile widths (mmq_x) are compiled. Upstream compiles every multiple of the
+// granularity up to 128 -- 11 kernels per quantization type on NVIDIA -- and picks the narrowest one
+// that needs the fewest column tiles. The MMQ kernels are half of all the GPU code in ggml-cuda.dll,
+// once per architecture, so the slim build keeps 7 widths: 8, 16, 32, 48, 64, 96, 128. A batch that
+// would have taken 24, 40, 80 or 112 takes the next width up (at most 1.33x the columns of that one
+// matmul); the 256-token prefill chunk is 2 x 128 either way. One predicate for host and device, so
+// the selection can never pick a width that was not compiled.
+static constexpr __host__ __device__ bool llapis_mmq_x_compiled(const int mmq_x) {
+#ifdef LLAPIS_CUDA_SLIM
+    return mmq_x == 8 || mmq_x == 16 || mmq_x == 32 || mmq_x == 48 || mmq_x == 64 || mmq_x == 96 || mmq_x == 128;
+#else
+    return mmq_x > 0;
+#endif // LLAPIS_CUDA_SLIM
+}
+
 #if defined(GGML_USE_HIP)
 static int mmq_get_nwarps_host(const int cc, const int warp_size) {
     return amd_mfma_available(cc) ? 8 : 256/warp_size;
@@ -3548,7 +3563,7 @@ static __global__ void mul_mat_q(
         const uint3 ntx) {
 
     // Skip unused template specializations for faster compilation:
-    if (mmq_x > get_mmq_x_max_device() || mmq_x % mmq_get_granularity_device(mmq_x) != 0) {
+    if (mmq_x > get_mmq_x_max_device() || mmq_x % mmq_get_granularity_device(mmq_x) != 0 || !llapis_mmq_x_compiled(mmq_x)) {
         NO_DEVICE_CODE;
         return;
     }
@@ -4068,6 +4083,9 @@ void mul_mat_q_case(ggml_backend_cuda_context & ctx, const mmq_args & args, cuda
 
     for (int mmq_x = 8; mmq_x <= mmq_x_max && ntiles_x_best > 1; mmq_x += 8) {
         const int granularity = mmq_get_granularity_host(mmq_x, cc);
+        if (!llapis_mmq_x_compiled(mmq_x)) {
+            continue;
+        }
 
         if (mmq_x % granularity != 0 || mmq_get_nbytes_shared<type>(mmq_x, mmq_y, cc, warp_size, nwarps) > smpbo) {
             continue;

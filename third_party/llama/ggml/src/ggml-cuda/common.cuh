@@ -3,6 +3,7 @@
 #include "ggml.h"
 #include "ggml-impl.h"
 #include "ggml-cuda.h"
+#include "llapis-probe.cuh"   // no-op unless -DLLAPIS_CUDA_PROBE=ON
 
 #include <cstdint>
 #include <cstdlib>
@@ -1423,6 +1424,26 @@ struct ggml_cuda_stream_context {
     }
 };
 
+// [llapis] cuBLAS is delay-loaded and the release zip does not carry it (llapis-gemm.cuh). Every
+// cuBLAS call acquires its handle through cublas_handle() below, so this is the one place to turn
+// "a path still needs cuBLAS and the DLL is absent" from a delay-load SEH exception (0xC06D007E,
+// no message) into a line in the log that says what happened and what to do.
+#ifdef _WIN32
+extern "C" __declspec(dllimport) void * __stdcall LoadLibraryA(const char * name);
+#endif
+static inline void llapis_require_cublas() {
+#ifdef _WIN32
+    char name[32];
+    snprintf(name, sizeof(name), "cublas64_%d.dll", CUDART_VERSION / 1000);
+    if (LoadLibraryA(name) == nullptr) {
+        GGML_ABORT("LLapis: an operation needs cuBLAS (%s), which the release does not ship: no LLapis "
+                   "kernel took this matrix product. Please report it with this log. Workaround: copy "
+                   "cublas64 and cublasLt64 from a CUDA %d Toolkit (bin\\x64) next to ggml-cuda.dll.",
+                   name, CUDART_VERSION / 1000);
+    }
+#endif
+}
+
 struct ggml_backend_cuda_context {
     int device;
     std::string name;
@@ -1508,6 +1529,12 @@ struct ggml_backend_cuda_context {
 
     cublasHandle_t cublas_handle(int device) {
         if (cublas_handles[device] == nullptr) {
+            // [llapis] F1-bis: EVERY cuBLAS call in this backend acquires its handle here, so this
+            // one line bounds "is cuBLAS reached at all" regardless of which site asked -- including
+            // sites the dispatch switch does not reveal (solve_tri.cu). The two mul_mat probes in
+            // ggml-cuda.cu attribute it. An empty probe run here is what licenses unlinking cuBLAS.
+            LLAPIS_PROBE_KEY("cublas handle created (device %d)", device);
+            llapis_require_cublas();
             ggml_cuda_set_device(device);
             CUBLAS_CHECK(cublasCreate(&cublas_handles[device]));
             CUBLAS_CHECK(cublasSetMathMode(cublas_handles[device], CUBLAS_TF32_TENSOR_OP_MATH));

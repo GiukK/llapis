@@ -125,7 +125,7 @@ if ($NoGpu) {
 # --- the release package: its files, and GPU code for this card ------------------
 if ($Release) {
   Section 'LLapis package'
-  $missing = @('moert-server.exe', 'ggml-cuda.dll', 'llama.dll', 'cudart64_13.dll', 'cublas64_13.dll', 'cublasLt64_13.dll', 'vcruntime140.dll', 'llapis-build.json') |
+  $missing = @('moert-server.exe', 'ggml-cuda.dll', 'llama.dll', 'cudart64_13.dll', 'vcruntime140.dll', 'llapis-build.json') |
     Where-Object { -not (Test-Path (Join-Path $Root "bin\$_")) }
   if ($missing) { Fail ("bin\ is missing: {0}" -f ($missing -join ', ')) 'Extract the whole zip again, into an empty folder.' } else { Ok 'bin\ holds the server, its DLLs and the CUDA runtime' }
   if (-not $NoGpu) {
@@ -164,7 +164,7 @@ if (-not $env:CUDA_PATH) {
         Ok "driver CUDA $driverCuda < toolkit $cudaVer`: fine within CUDA $($cudaVer.Major) (minor-version compatibility)"
       }
     }
-    foreach ($d in 'cudart64_13.dll', 'cublas64_13.dll', 'cublasLt64_13.dll') {
+    foreach ($d in 'cudart64_13.dll') {
       if (-not (Test-Path (Join-Path $env:CUDA_PATH "bin\x64\$d"))) { Warn "$d not found in $env:CUDA_PATH\bin\x64" 'The launcher copies it next to the server from there; reinstall the toolkit if it is missing.' }
     }
   }
@@ -226,8 +226,8 @@ if (-not $Build -and -not $Smoke) {
     # Point at the step this install is actually at: no models yet / models but no prepare / no setup / ready.
     $hasLow  = @(Get-ChildItem (Join-Path $Root 'models\low') -Filter '*.gguf' -ErrorAction SilentlyContinue).Count -gt 0
     $hasPrep = Test-Path (Join-Path $Root 'models\cache\low.experts.pack')
-    if (-not $hasLow)      { Write-Host 'Next: download the models (README, "Models"), then .\bin\moert-server.exe prepare' }
-    elseif (-not $hasPrep) { Write-Host 'Next: .\bin\moert-server.exe prepare' }
+    if (-not $hasLow)      { Write-Host 'Next: download the models (README, "Models"), then .\llapis.cmd setup' }
+    elseif (-not $hasPrep) { Write-Host 'Next: .\llapis.cmd setup' }
     elseif (-not (Test-Path (Join-Path $Root 'llapis-user.json'))) { Write-Host 'Next: .\llapis.cmd setup' }
     else { Write-Host 'Next: .\llapis.cmd serve' }
   }

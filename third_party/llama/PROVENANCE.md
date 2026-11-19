@@ -13,26 +13,28 @@ pinned SHA to re-fetch: `git clone` then `cmake` is the whole build, and it need
 | Commit | `050ee92d04c2e1f639025786dea701c70e7d4204` |
 | Tag | `b9821` |
 | License | MIT -- see `LICENSE` here and `THIRD_PARTY_LICENSES.txt` at the repo root |
-| Generated | 2026-11-06 16:09 UTC |
+| Generated | 2026-11-16 03:36 UTC |
 
 ## The boundary, in one line
 
-**LLapis owns 71 files of 867.** Everything else is upstream at the pin, unmodified.
+**LLapis owns 77 files of 869.** Everything else is upstream at the pin, unmodified.
 
 | | files |
 |---|---:|
-| added by LLapis | **5** |
-| modified by LLapis, carrying logic | **50** |
+| added by LLapis | **7** |
+| modified by LLapis, carrying logic | **54** |
 | modified by LLapis, generated output of a config change | 16 |
 | deleted by LLapis (unreachable for this vertical) | 1490 |
 | deleted by LLapis (web UI source, never compiled) | 598 |
-| inherited untouched | 796 |
+| inherited untouched | 792 |
 
 Since **D-008** (F1) there is no `git pull` from upstream: the inherited files are frozen at the
 pin. They are not "kept current" -- they are simply not ours.
 
 ## Added by LLapis
 
+- `ggml/src/ggml-cuda/llapis-gemm.cu`
+- `ggml/src/ggml-cuda/llapis-gemm.cuh`
 - `ggml/src/ggml-cuda/llapis-probe.cuh`
 - `ggml/src/ggml-cuda/moe-dual.cu`
 - `ggml/src/ggml-cuda/moe-dual.cuh`
@@ -41,7 +43,7 @@ pin. They are not "kept current" -- they are simply not ours.
 
 ## Modified by LLapis -- the maintenance surface
 
-These 50 files carry LLapis logic. This is the real surface anyone maintaining this
+These 54 files carry LLapis logic. This is the real surface anyone maintaining this
 project has to understand; the rest of the tree is upstream's.
 
 | file | area |
@@ -58,12 +60,16 @@ project has to understand; the rest of the tree is upstream's.
 | `ggml/include/ggml.h` | the dual-precision op reaches ggml |
 | `ggml/src/ggml-backend.cpp` | the dual-precision op reaches ggml |
 | `ggml/src/ggml-cuda/CMakeLists.txt` | the dual-precision op reaches ggml |
+| `ggml/src/ggml-cuda/argsort.cu` | other |
+| `ggml/src/ggml-cuda/argsort.cuh` | other |
 | `ggml/src/ggml-cuda/common.cuh` | the dual-precision op reaches ggml |
 | `ggml/src/ggml-cuda/fattn-tile.cu` | kernel selection, pruned to this model (F2) |
 | `ggml/src/ggml-cuda/fattn.cu` | kernel selection, pruned to this model (F2) |
 | `ggml/src/ggml-cuda/ggml-cuda.cu` | the dual-precision op reaches ggml |
 | `ggml/src/ggml-cuda/mmf.cu` | other |
+| `ggml/src/ggml-cuda/mmf.cuh` | other |
 | `ggml/src/ggml-cuda/mmq.cu` | kernel selection, pruned to this model (F2) |
+| `ggml/src/ggml-cuda/mmq.cuh` | other |
 | `ggml/src/ggml-cuda/mmvq.cu` | THE upstream kernel we modify (fragile) |
 | `ggml/src/ggml-cuda/mmvq.cuh` | THE upstream kernel we modify (fragile) |
 | `ggml/src/ggml-cuda/template-instances/generate_cu_files.py` | kernel selection, pruned to this model (F2) |

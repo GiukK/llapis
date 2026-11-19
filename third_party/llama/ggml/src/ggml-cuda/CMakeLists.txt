@@ -108,20 +108,41 @@ if (CUDAToolkit_FOUND)
         message(STATUS "LLapis: CUDA reachability probe is ON")
     endif()
 
+    # LLapis slim build (ON): leave out the GPU kernels no supported card can select for this model.
+    # ggml-cuda.dll is ~85% of the release zip and every kernel is compiled once per architecture.
+    #   - flash attention TILE and WMMA: only chosen without Turing tensor cores (CUDA 13 needs RTX 20+)
+    #   - flash attention VEC for a Q4_0 / Q8_0 / BF16 KV cache: LLapis always uses F16
+    #   - mmf: 1..4 columns, F32/F16, NVIDIA rows per block (5..16 columns go to llapis-gemm)
+    # Each one is refused in its dispatch (fattn.cu, mmf.cu), not left to a link error or an abort.
+    option(LLAPIS_CUDA_SLIM "llapis: compile only the CUDA kernels an RTX card can select for this model" ON)
+    if (LLAPIS_CUDA_SLIM)
+        add_compile_definitions(LLAPIS_CUDA_SLIM)
+        message(STATUS "LLapis: slim CUDA kernel set")
+    endif()
+
     file(GLOB   GGML_HEADERS_CUDA "*.cuh")
     list(APPEND GGML_HEADERS_CUDA "../../include/ggml-cuda.h")
 
     file(GLOB   GGML_SOURCES_CUDA "*.cu")
-    file(GLOB   SRCS "template-instances/fattn-tile*.cu")
-    list(APPEND GGML_SOURCES_CUDA ${SRCS})
     file(GLOB   SRCS "template-instances/fattn-mma*.cu")
     list(APPEND GGML_SOURCES_CUDA ${SRCS})
     file(GLOB   SRCS "template-instances/mmq*.cu")
     list(APPEND GGML_SOURCES_CUDA ${SRCS})
-    file(GLOB   SRCS "template-instances/mmf*.cu")
-    list(APPEND GGML_SOURCES_CUDA ${SRCS})
+    if (LLAPIS_CUDA_SLIM)
+        list(FILTER GGML_SOURCES_CUDA EXCLUDE REGEX "/fattn-(tile|wmma-f16)\\.cu$")
+        foreach(_n 1 2 3 4)
+            list(APPEND GGML_SOURCES_CUDA template-instances/mmf-instance-ncols_${_n}.cu)
+        endforeach()
+    else()
+        file(GLOB   SRCS "template-instances/fattn-tile*.cu")
+        list(APPEND GGML_SOURCES_CUDA ${SRCS})
+        file(GLOB   SRCS "template-instances/mmf*.cu")
+        list(APPEND GGML_SOURCES_CUDA ${SRCS})
+    endif()
 
-    if (GGML_CUDA_FA_ALL_QUANTS)
+    if (LLAPIS_CUDA_SLIM)
+        list(APPEND GGML_SOURCES_CUDA template-instances/fattn-vec-instance-f16-f16.cu)
+    elseif (GGML_CUDA_FA_ALL_QUANTS)
         file(GLOB   SRCS "template-instances/fattn-vec*.cu")
         list(APPEND GGML_SOURCES_CUDA ${SRCS})
         add_compile_definitions(GGML_CUDA_FA_ALL_QUANTS)
@@ -193,6 +214,14 @@ if (CUDAToolkit_FOUND)
             target_link_libraries(ggml-cuda PRIVATE  CCCL::CCCL)
         endif()
         target_link_libraries(ggml-cuda PRIVATE CUDA::cudart CUDA::cublas)
+        # LLapis: load cuBLAS only at its first call. The handle is created lazily
+        # (ggml_backend_cuda_context::cublas_handle), so a process whose graph never reaches a
+        # cuBLAS path never maps cublas64/cublasLt64 (~490 MB, 87% of the release zip), and a path
+        # that does reach it fails loudly at that call when the DLL is absent.
+        if (MSVC)
+            target_link_options(ggml-cuda PRIVATE "/DELAYLOAD:cublas64_${CUDAToolkit_VERSION_MAJOR}.dll")
+            target_link_libraries(ggml-cuda PRIVATE delayimp)
+        endif()
     endif()
 
     if (GGML_CUDA_NO_VMM)

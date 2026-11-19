@@ -27,7 +27,7 @@ if (-not $NoLoaderCut) {
     Say-Info "[llapis] loader cut ON by default (product config, -584 MiB VRAM); -NoLoaderCut to disable"
   } else {
     Write-Host "[llapis] cold arena not found ($ix) - staying on the no-cut borrowed path" -ForegroundColor Yellow
-    Write-Host "            (run 'moert-server prepare' to build the store and get the product config)" -ForegroundColor Yellow
+    Write-Host "            (run 'llapis setup' once: it builds the store, and with it the faster configuration)" -ForegroundColor Yellow
   }
 }
 # C5.5: fall back to the HARDCODED layout (models/low, models/high), never to a
@@ -63,7 +63,10 @@ foreach ($d in 'ggml-base', 'ggml-cpu', 'ggml-cuda', 'ggml', 'llama', 'llama-com
 # on the same build, a 12% loss whose only symptom was the number.
 $cudaBin = if ($env:CUDA_PATH) { Join-Path $env:CUDA_PATH 'bin\x64' } else { $null }
 if ($cudaBin -and (Test-Path $cudaBin)) {
-  foreach ($d in 'cudart64_13.dll', 'cublas64_13.dll', 'cublasLt64_13.dll') {
+  # cuBLAS is not staged: ggml-cuda delay-loads it and never calls it (ggml-cuda/llapis-gemm.cuh).
+  # LLAPIS_CUBLAS=1 (an A/B against the old path) stages it too.
+  $cudaDlls = @('cudart64_13.dll'); if ($env:LLAPIS_CUBLAS -and $env:LLAPIS_CUBLAS -ne '0') { $cudaDlls += 'cublas64_13.dll', 'cublasLt64_13.dll' }
+  foreach ($d in $cudaDlls) {
     $src = Join-Path $cudaBin $d
     $dst = Join-Path $Rel $d
     if (-not (Test-Path $src)) { continue }
@@ -75,7 +78,7 @@ if ($cudaBin -and (Test-Path $cudaBin)) {
   }
 } elseif (-not (Test-Path (Join-Path $Rel 'cudart64_13.dll'))) {
   Write-Host "[llapis] CUDA_PATH is not set and the CUDA runtime is not staged next to the server." -ForegroundColor Yellow
-  Write-Host "         Copy cudart64_13.dll, cublas64_13.dll and cublasLt64_13.dll from" -ForegroundColor Yellow
+  Write-Host "         Copy cudart64_13.dll from" -ForegroundColor Yellow
   Write-Host "         <CUDA Toolkit>\bin\x64 into $Rel -- see the README." -ForegroundColor Yellow
 }
 
@@ -156,12 +159,19 @@ $script:kClamped = $false   # set true by the ctx-driven K-clamp below; read by 
 function Add-Plan([string]$name, $value, [string]$source) {
   $script:PrefillPlan[$name] = [pscustomobject]@{ value = $value; source = $source }
 }
+# The resolved internals (K clamp, residency policy, prefill plan) are for -Verbose, -Debug and
+# -DryRun. A plain `llapis serve` used to open with six lines of them above the banner: the first
+# thing a new user read was "K auto-clamped 128 -> 59 ... slab+NE+KV". They are all in the log
+# and in logs\prefill_plan.json either way.
+function Say-Plan([string]$m, [string]$Color = 'Cyan') {
+  if ($VerboseMode -or $DebugMode -or $DryRun) { Write-Host $m -ForegroundColor $Color }
+}
 function Write-PrefillPlan {
   if (-not $script:PrefillPlan -or $script:PrefillPlan.Count -eq 0) { return }
-  Write-Host "[llapis] prefill plan (resolved effective config):" -ForegroundColor DarkCyan
+  Say-Plan "[llapis] prefill plan (resolved effective config):" 'DarkCyan'
   foreach ($k in $script:PrefillPlan.Keys) {
     $e = $script:PrefillPlan[$k]
-    Write-Host ("             {0,-20} = {1,-9} [{2}]" -f $k, $e.value, $e.source) -ForegroundColor DarkCyan
+    Say-Plan ("             {0,-20} = {1,-9} [{2}]" -f $k, $e.value, $e.source) 'DarkCyan'
   }
   $planDir = Join-Path $Root 'logs'
   try { New-Item -ItemType Directory -Force -Path $planDir | Out-Null } catch {}
@@ -306,7 +316,8 @@ if ($script:KeepFreeMib -ne $script:VkvKeepMib) {
   # the runtime re-derives the keep-free from the budget in its own free-VRAM units (server_main.cpp)
   $env:MOE_DUAL_VRAM_BUDGET_MIB = "$($script:VramBudgetMib)"
   $tot = Get-TotalVramMiB
-  Write-Host ("[llapis] VRAM budget: up to {0} MiB for LLapis ({1} MiB card) -> keeping {2} MiB free; the expert cache is sized to what is left and re-fitted at every context change. -VramBudget 0 for MAX." -f $script:VramBudgetMib, $tot, $script:KeepFreeMib) -ForegroundColor Cyan
+  $script:VramTotalMib = $tot   # the banner prints the budget (cli/server.ps1)
+  Say-Plan ("[llapis] VRAM budget: up to {0} MiB for LLapis ({1} MiB card) -> keeping {2} MiB free; the expert cache is sized to what is left and re-fitted at every context change. -VramBudget 0 for MAX." -f $script:VramBudgetMib, $tot, $script:KeepFreeMib)
 }
 # Variable-KV (DEFAULT ON for chat/serve; resolved in llapis.ps1, see the block after the saved
 # setup is applied). MOE_DUAL_VKV is the canonical arming name and is set HERE, after this file's own
@@ -333,7 +344,7 @@ if ($script:VkvOn) {
 $place = @('--ngl', "$Ngl")
 
 if (-not (Test-Path $Model)) {
-  Write-Error "the base model was not found: $Model`n  Run 'moert-server prepare' to derive it (see the README)."
+  Write-Error "the base model was not found: $Model`n  Run 'llapis setup': it builds it from the models (once, about a minute)."
   Stop-Launcher 1
 }
 # Start K at the SOURCE's own cap: the ctx clamp below only ever LOWERS it. Starting lower
@@ -382,7 +393,7 @@ if ($Vision -and $Mode -in @('chat', 'serve') -and -not $SetupApplied) {
 if ($Vision -and $Mode -in @('chat', 'serve')) {
   $K = 22
   $env:MOE_DUAL_K = "$K"   # re-stamp: the block above already baked the pre-clamp K into the env
-  Write-Host "[llapis] K auto-clamped to 22 to fit the GPU-offloaded projector (~1 GiB) in 8 GB VRAM alongside the hot slab." -ForegroundColor Cyan
+  Say-Plan "[llapis] K auto-clamped to 22 to fit the GPU-offloaded projector (~1 GiB) in 8 GB VRAM alongside the hot slab."
 }
 
 # VRAM-MEASURED ctx-driven K clamp: the MTP drafter loads LAST, on top of slab + NE + ctx-sized KV;
@@ -393,6 +404,20 @@ if ($Mode -in @('chat', 'serve')) {
   $kres  = Resolve-KMaxForCtx $Ctx
   $kCeil = [int]$kres.KMax
   $freeStr = if ($kres.Measured) { "$($kres.Free) MiB free (nvidia-smi)" } else { "~$($kres.Free) MiB free (ESTIMATE -- nvidia-smi unavailable)" }
+  # A LLapis server already loaded on this port is what holds the VRAM: `llapis chat` (and a second
+  # `llapis serve`) REUSE it (cli/server.ps1), so nothing is about to be loaded and there is nothing to
+  # fit. Without this, `llapis chat` in a second terminal died here with "ctx 8192 does not fit on this
+  # GPU right now (782 MiB free)" -- the free VRAM it measured was what its own server had left.
+  if ($kCeil -lt $script:PrefillCalib.KMin) {
+    $probeHost = if ($BindAddress -in @('0.0.0.0', '::', '*')) { '127.0.0.1' } else { $BindAddress }
+    try {
+      $up = Invoke-RestMethod -Uri ("http://{0}:{1}/v1/models" -f $probeHost, $Port) -TimeoutSec 2 -ErrorAction Stop
+      if (@($up.data | Where-Object { "$($_.status.value)" -eq 'loaded' }).Count) {
+        Say-Plan "[llapis] a LLapis server is already loaded on port $Port -- skipping the VRAM fit (it will be reused)"
+        $kCeil = [int]$script:PrefillCalib.KMin
+      }
+    } catch { }
+  }
   # A VRAM budget is a preference ("keep this much free"), not the card's size. When it is the budget
   # -- not the card -- that leaves less than the minimum expert cache, start at K=KMin over budget and
   # say so; refuse only when K=KMin does not fit PHYSICALLY. (findings 184: `quality` at the golden's
@@ -422,7 +447,7 @@ if ($Mode -in @('chat', 'serve')) {
     Stop-Launcher 1
   }
   if ($K -gt $kCeil) {
-    Write-Host ("[llapis] K auto-clamped {0} -> {1} to fit ctx {2} within the measured VRAM budget ({3}); the MTP drafter loads last, on top of slab+NE+KV, and an unclamped K would exhaust VRAM at draft load." -f $K, $kCeil, $Ctx, $freeStr) -ForegroundColor Cyan
+    Say-Plan ("[llapis] K auto-clamped {0} -> {1} to fit ctx {2} within the measured VRAM budget ({3}); the MTP drafter loads last, on top of slab+NE+KV, and an unclamped K would exhaust VRAM at draft load." -f $K, $kCeil, $Ctx, $freeStr)
     $K = $kCeil
     $env:MOE_DUAL_K = "$K"
     $script:kClamped = $true
@@ -445,9 +470,9 @@ $env:GGML_CUDA_DISABLE_GRAPHS = $null
 if ($Mode -in @('chat', 'serve')) {
   if (-not (Test-Path 'Env:MOE_DUAL_ASYNC_PROMOTE')) { $env:MOE_DUAL_ASYNC_PROMOTE = '1' }
   $pv = { param($n, $d) $v = [Environment]::GetEnvironmentVariable($n); if ($v) { $v } else { $d } }
-  Write-Host ("[llapis] Speculative residency: async promotion={0} exclusive arena={1} | cost rule H={2} r={3} per-token={4}" -f `
+  Say-Plan ("[llapis] Speculative residency: async promotion={0} exclusive arena={1} | cost rule H={2} r={3} per-token={4}" -f `
               $env:MOE_DUAL_ASYNC_PROMOTE, (& $pv 'MOE_DUAL_ARENA_EXCLUSIVE' '1'),
-              (& $pv 'MOE_DUAL_COST_H' '16'), (& $pv 'MOE_DUAL_COST_R' '2'), (& $pv 'MOE_DUAL_COST_PER_TOKEN' '4')) -ForegroundColor Cyan
+              (& $pv 'MOE_DUAL_COST_H' '16'), (& $pv 'MOE_DUAL_COST_R' '2'), (& $pv 'MOE_DUAL_COST_PER_TOKEN' '4'))
   # --- the prefill (the only path since elision E3, claude dump findings 179/180/183/186) ---
   # The streamed prefill's staging is a fixed reserve allocated with an EMPTY slab before the first prompt
   # (the boot slab) and K is fitted around it: no slab eviction, no rebuild from the file. Hot experts are
@@ -456,7 +481,7 @@ if ($Mode -in @('chat', 'serve')) {
   # residency), which is also what fills the slab on the first prompt. MOE_DUAL_Q4S_ARENA=0 reads speed's
   # cold pages from the SSD too (then depth 2 when K allows it).
   if ($script:LlapisMode -eq 'speed' -and -not (Test-Path 'Env:MOE_DUAL_Q4S_ARENA')) { $env:MOE_DUAL_Q4S_ARENA = '1' }
-  Write-Host ("[llapis] Prefill: cold pages from the RAM arena={0}" -f $(if ($env:MOE_DUAL_Q4S_ARENA) { $env:MOE_DUAL_Q4S_ARENA } else { '0' })) -ForegroundColor Cyan
+  Say-Plan ("[llapis] Prefill: cold pages from the RAM arena={0}" -f $(if ($env:MOE_DUAL_Q4S_ARENA) { $env:MOE_DUAL_Q4S_ARENA } else { '0' }))
   # CUDA graphs over the segments between the MoE ops (Variant P, claude dump findings 176, default since
   # 198): +6.5% decode with MTP in speed, neutral to +2% in quality, golden unchanged. MOE_DUAL_GRAPH_SEGMENTS=0 turns it off.
   if (-not (Test-Path 'Env:MOE_DUAL_GRAPH_SEGMENTS')) { $env:MOE_DUAL_GRAPH_SEGMENTS = '1' }
@@ -509,7 +534,7 @@ if ($mtpDefault) {
       $dh = Get-ChildItem (Split-Path $draftPath) -Filter (([IO.Path]::GetFileNameWithoutExtension($draftPath)) + '.draft-head-*.gguf') -ErrorAction SilentlyContinue |
             Select-Object -First 1
       if ($dh) { $draftPath = $dh.FullName }
-      elseif (Test-Path (Join-Path (Split-Path (Split-Path (Split-Path $draftPath))) 'assets\mtp')) { Write-Host "[llapis] tip: run 'moert-server prepare' once to build the two-stage drafter head (~2.6 ms less per decode step)" -ForegroundColor Yellow }
+      elseif (Test-Path (Join-Path (Split-Path (Split-Path (Split-Path $draftPath))) 'assets\mtp')) { Write-Host "[llapis] tip: run 'llapis setup' once to build the two-stage drafter head (~2.6 ms less per decode step)" -ForegroundColor Yellow }
     }
     # A/B lever (claude dump findings 243): MOE_DUAL_DRAFT_GGUF=<path> loads a given drafter
     if ($env:MOE_DUAL_DRAFT_GGUF -and (Test-Path $env:MOE_DUAL_DRAFT_GGUF)) { $draftPath = $env:MOE_DUAL_DRAFT_GGUF }

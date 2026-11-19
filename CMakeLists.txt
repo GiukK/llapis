@@ -128,6 +128,8 @@ if(WIN32)
       list(APPEND _moert_dlls "$<TARGET_FILE:${_t}>")
     endif()
   endforeach()
+  # cuBLAS is copied only for the LLAPIS_CUBLAS=1 A/B: ggml-cuda delay-loads it and, by default, never
+  # calls it (ggml-cuda/llapis-gemm.cuh). The release zip does not carry it.
   if(TARGET ggml-cuda AND CUDAToolkit_BIN_DIR)
     file(GLOB _cuda_dlls
       "${CUDAToolkit_BIN_DIR}/x64/cudart64_*.dll" "${CUDAToolkit_BIN_DIR}/x64/cublas64_*.dll" "${CUDAToolkit_BIN_DIR}/x64/cublasLt64_*.dll"
@@ -268,6 +270,20 @@ add_test(NAME sidecar-kernels     COMMAND test-sidecar-kernels)
 # These two link the ggml DLLs, which the build writes to bin/<config>, not next to the tests: on a fresh
 # build tree they failed with 0xc0000135 (DLL not found). They only passed where the launcher had already
 # staged the DLLs next to moert-server.exe.
+# The GEMM that replaces cuBLAS (ggml-cuda/llapis-gemm.cuh) against a CPU reference. Needs a GPU; prints
+# SKIP and passes without one.
+if(TARGET ggml-cuda)
+  add_executable(test-llapis-gemm tests/test_llapis_gemm.cpp)
+  target_compile_features(test-llapis-gemm PRIVATE cxx_std_17)
+  target_include_directories(test-llapis-gemm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llama/ggml/include)
+  target_link_libraries(test-llapis-gemm PRIVATE ggml ggml-base ggml-cuda)
+  target_compile_definitions(test-llapis-gemm PRIVATE CUDART_MAJOR_FOR_TEST=${CUDAToolkit_VERSION_MAJOR})
+  add_test(NAME llapis-gemm COMMAND test-llapis-gemm)
+  if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.22")
+    set_tests_properties(llapis-gemm PROPERTIES
+      ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:ggml>")
+  endif()
+endif()
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.22")
   set_tests_properties(model-plan sidecar-kernels PROPERTIES
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:ggml>")

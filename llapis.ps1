@@ -10,6 +10,7 @@
 #   chat    -> cli/launcher.ps1 chat    terminal REPL against that same server
 #   setup   -> cli/launcher.ps1 setup   quality|speed + VRAM budget
 #   agents  -> cli/launcher.ps1 agents  provider JSON for external harnesses
+#   prepare -> (here) run `moert-server prepare`: derive models\cache from the downloaded files
 #   status  -> (here) ask a RUNNING server what it is actually running
 #   reset   -> (here) clear the server's cached conversation KV
 #   stop    -> (here) shut a running server down cleanly
@@ -56,15 +57,23 @@ function Get-LlapisHost {
 
 function Show-LlapisUsage {
   Write-Host ""
-  Write-Host "LLapis -- local Gemma 4 26B-A4B, served." -ForegroundColor Cyan
+  # the release zip carries its version in bin\llapis-build.json: say it, a bug report needs it
+  $ver = ''
+  try { $ver = ' ' + (Get-Content (Join-Path $Root 'bin\llapis-build.json') -Raw -ErrorAction Stop | ConvertFrom-Json).version } catch { }
+  Write-Host "LLapis$ver -- local Gemma 4 26B-A4B, served." -ForegroundColor Cyan
   Write-Host ""
+  Write-Host "First time, after downloading the models into models\ (README, 'Models'):" -ForegroundColor DarkGray
+  Write-Host "  llapis setup            Choose the runtime (quality | speed) and the VRAM budget;"
+  Write-Host "                          it then builds LLapis' own files from the models (once, ~1 min)"
+  Write-Host ""
+  Write-Host "Every day:" -ForegroundColor DarkGray
   Write-Host "  llapis serve            Start the server + web UI on http://127.0.0.1:8077"
   Write-Host "  llapis chat             Terminal chat (starts or reuses that same server)"
-  Write-Host "  llapis setup            Choose the runtime (quality | speed) and the VRAM budget"
   Write-Host "  llapis agents           Print the provider JSON for an agent harness"
   Write-Host "  llapis status           What is the running server actually running?"
   Write-Host "  llapis reset            Clear the cached conversation (KV) on the server"
   Write-Host "  llapis stop             Shut the running server down"
+  Write-Host "  llapis prepare          Rebuild the files setup derives from the models (--force)" -ForegroundColor DarkGray
   Write-Host ""
   Write-Host "Useful flags on serve/chat:" -ForegroundColor DarkGray
   Write-Host "  -Port <n>      serve on another port (default 8077)" -ForegroundColor DarkGray
@@ -72,6 +81,7 @@ function Show-LlapisUsage {
   Write-Host "  -VramBudget <MiB>  cap total VRAM use for this session (0 = use what is free)" -ForegroundColor DarkGray
   Write-Host "  -DryRun        resolve everything and print the plan without starting" -ForegroundColor DarkGray
   Write-Host "  -Open          open the browser once the server is ready" -ForegroundColor DarkGray
+  Write-Host "  -Vision        read images too (needs the projector in models\mmproj)" -ForegroundColor DarkGray
   Write-Host "  -Verbose / -Debug / -Trace   progressively louder internals" -ForegroundColor DarkGray
   Write-Host "  -NoVariableKv  pin the context at -Ctx instead of growing it" -ForegroundColor DarkGray
   Write-Host "  -NoLoaderCut   load expert tensors the stock way (costs ~584 MiB VRAM)" -ForegroundColor DarkGray
@@ -375,6 +385,26 @@ switch ($Command.ToLowerInvariant()) {
   'status'  { exit (Invoke-LlapisStatus) }
   'stop'    { exit (Invoke-LlapisStop) }
   'reset'   { exit (Invoke-LlapisReset) }
+  # `prepare` is the server binary's own verb (a pure file transform: no GPU, no model load). It
+  # is exposed here so that every command a user types is `llapis <verb>`: it used to be the one
+  # step of the first run that needed the path of an .exe, different for the zip and a source build.
+  'prepare' {
+    $exe = @((Join-Path $Root 'bin\moert-server.exe'), (Join-Path $Root 'build-cuda\Release\moert-server.exe')) |
+           Where-Object { Test-Path $_ } | Select-Object -First 1
+    if (-not $exe) {
+      Write-Host "llapis: the server binary was not found (bin\moert-server.exe in the release zip," -ForegroundColor Red
+      Write-Host "        build-cuda\Release\moert-server.exe in a source build)." -ForegroundColor Red
+      exit 1
+    }
+    if (-not @(Get-ChildItem (Join-Path $Root 'models\low') -Filter '*.gguf' -ErrorAction SilentlyContinue).Count) {
+      Write-Host "llapis prepare: there is no model in models\low yet." -ForegroundColor Yellow
+      Write-Host "Download the models first (README.md, section 'Models'), then run this again."
+      exit 1
+    }
+    Push-Location $Root
+    try { & $exe prepare @Rest; $rc = $LASTEXITCODE } finally { Pop-Location }
+    exit $rc
+  }
   # `help` is FORWARDED, not answered here: the long version (model folders, the
   # capability flags, where the logs go) lives in the launcher, and answering it here
   # left that text unreachable for anyone who did not open the file. Bare `llapis`

@@ -27,8 +27,7 @@ RAM. **Nothing else to install**: no compiler, no CUDA Toolkit, no Git.
 cd C:\llapis                        # or wherever the extracted folder is
 .\build-check.cmd                   # checks the GPU, the driver, RAM and disk
 # download the model files into models\ (commands in "Models" below), then:
-.\bin\moert-server.exe prepare
-.\llapis.cmd setup
+.\llapis.cmd setup                  # two questions; then it builds its own files, once (~1 min)
 .\llapis.cmd serve -Open
 ```
 
@@ -51,8 +50,8 @@ The release is compiled for every consumer generation CUDA 13 supports, and
 | RTX 40 series (Ada, sm_89) | machine code | **yes** — the reference machine, RTX 4070 Laptop 8 GB |
 | RTX 30 series (Ampere, sm_86) | machine code | **yes** — RTX 3090 24 GB, by an external tester |
 | RTX 20 / GTX 16 series (Turing, sm_75) | machine code | not yet |
-| RTX 50 series (Blackwell, sm_120) | machine code + PTX | not yet |
-| a later NVIDIA GPU | PTX, compiled by the driver at the first start (minutes, once) | no |
+| RTX 50 series (Blackwell, sm_120) | machine code | not yet |
+| a later NVIDIA GPU | none yet: it needs a new release (or a source build) | — |
 | GTX 10 series and older | none: CUDA 13 does not support them | — |
 
 "Not yet" means compiled for and expected to work, but not run by us. If you run it
@@ -80,6 +79,55 @@ worked, with the output of `.\build-check.cmd` attached.
 
 ---
 
+## Performance
+
+On the reference machine, against llama.cpp **tuned for that same machine**, with the
+same model file and the same drafter: **1.83× the generation speed with no VRAM limit
+set, and 2.05× with the budget capped at 6000 MiB**. A conversation turn finishes in
+3.9 s instead of 6.1.
+
+| budget | system | config | VRAM MiB | chat tok/s | TTFT ms | turn s | long prompt, prefill tok/s |
+|---|---|---|---:|---:|---:|---:|---:|
+| max | llama.cpp, tuned | `--n-cpu-moe 13 -ub 512`, KV f16 | 7707 | 61.1 | 1031 | 6.14 | 905 |
+| max | llama.cpp, `--fit` | out of the box | 6613 | 52.5 | 1189 | 6.95 | 790 |
+| max | **LLapis** | K 57 | 6986 | **111.9** | 1095 | **3.85** | **1620** |
+| 6000 | llama.cpp, tuned | `--n-cpu-moe 19 -ub 512`, KV q8_0 | 5919 | 49.0 | 1251 | 7.35 | 690 |
+| 6000 | **LLapis** | K 42 | 6057 | **100.5** | 1233 | **4.39** | **1634** |
+
+**How this was measured.** RTX 4070 Laptop 8 GB, Ryzen 9 7845HX, 16 GB RAM, driver
+592.00, fresh reboot with 78 MiB of VRAM held by other applications. llama.cpp build
+12182 against LLapis 2026.11.07. `speed` mode, so both runtimes read the same
+`UD-IQ2_M` file, and both run the same MTP drafter at depth 3. The workload is 6
+conversations × 4 turns (code, prose and reasoning, 320 tokens each, temperature 0), 6
+fixed 256-token coding prompts, and one 11 200-token prompt; every figure is the median
+over an arm's turns, then over 2 repetitions, which agreed within 1–2%.
+
+**llama.cpp was not left on its defaults.** For each budget it was swept over
+`--n-cpu-moe` (keeping the smallest N whose VRAM really fits), batch size `-ub`
+512/2048/4096 and KV cache f16/q8_0, and the best combination was kept. `--fit` is
+listed separately as the arm you get without tuning.
+
+**What these numbers do not claim:**
+
+- **Time to first token is a tie**, about 1.0–1.25 s for both. Per turn LLapis
+  re-reads more of the conversation than llama.cpp does; that is the part of the
+  measurement where it has nothing to show.
+- **If the whole model fits in your VRAM, this is the wrong tool** — see
+  [Known limits](#known-limits-of-this-first-release). On an RTX 3090 with every
+  expert resident, generation is on par with tuned llama.cpp and the prompt is read
+  more slowly.
+- **A second card, by someone else.** An external tester ran the same script on an
+  RTX 3090 24 GB (Ryzen 7 5800X, 32 GB) with the budget capped to 6000 and 8000 MiB,
+  and measured the same direction by a wider margin. llama.cpp was not tuned there with
+  these settings, so the honest reading of that run is "at least 2×", not the larger
+  ratio it printed.
+- **Tuned llama.cpp is fragile on this box in a way LLapis is not.** `--n-cpu-moe 13`
+  only fits on a freshly rebooted machine; one layer lower, WDDM starts spilling into
+  shared memory and generation collapses to 15–23 tok/s. LLapis fits itself to the VRAM
+  that is actually free, at every prompt.
+
+---
+
 ## Requirements
 
 Verified on the reference machine. Anything materially different is untested, not
@@ -92,7 +140,7 @@ unsupported — but you are the first to try it. This is all the release zip nee
 | GPU | NVIDIA RTX 4070 Laptop, 8 GB | **compute capability 7.5 or newer** — see below |
 | Driver | 592.00 | one that supports CUDA 13: the R580 family or newer |
 | RAM | 16 GB (15.2 GiB usable) | this is the binding constraint, see below |
-| Disk | ~21 GB for `speed`, ~48 GB for `quality` | see the breakdown below |
+| Disk | ~20 GB for `speed`, ~47 GB for `quality` | see the breakdown below |
 
 **On RAM.** The IQ2 cold tier is a ~9.3 GiB file and the runtime keeps the routed
 working set resident in RAM. On a 16 GB machine that fits with the arena partly
@@ -127,8 +175,8 @@ small machine. RAM is: see above.
 **On disk.** The model files you download are 10.5 GB for `speed` (IQ2 + drafter) or 27.5 GB
 for `quality` (those plus the Q4 source); the vision projector adds 1.2 GB. On top of that,
 `prepare` derives 8.8 GB of artifacts for `speed` or 19.6 GB for `quality` (see the table in
-[Models](#models)). Add the program — ~1 GB extracted, about the same for a source build's
-tree and repository — and you get the figures above. All sizes here are measured, in GB of 10⁹ bytes.
+[Models](#models)). Add the program — about 45 MB extracted from a 33 MB zip; a source build's tree and
+repository are about 1 GB — and you get the figures above. All sizes here are measured, in GB of 10⁹ bytes.
 
 **Install path.** Any folder works for the release zip, including one with spaces in
 its name: every command in this file was run from one. A source build has one limit,
@@ -201,16 +249,23 @@ of them is safe — each one rebuilds itself:
 | `low.experts.{index,pack}` — the IQ2 experts repacked into the runtime's own cold store, one dense run per layer and matrix so the runtime can map it read-only | 7.7 GiB | both (optional, see below) | `prepare` (a pack built before 2026-10-08 still works but is copied into RAM, and the startup says so: run `prepare` once and it rebuilds it) |
 | `models/mtp/<drafter>.draft-head-r192.gguf` — the drafter with a two-stage vocabulary head (an approximate head from the basis shipped in `assets/mtp/`, then the exact logits of 2048 candidates): ~2.6 ms less per decode step, the text is unchanged (the target verifies every draft) | 492 MiB | both (optional: without it the plain drafter runs) | `prepare` (a few seconds; skipped with a message if your drafter is not the one in the table above) |
 
-**You build them yourself, once**, from the directory holding `llapis.ps1`:
+**`llapis setup` builds them**, the first time and whenever one is missing (after you add the
+Q4 file for quality, say, or delete the cache): it says what it is about to write and how
+large, checks the free disk, and refuses while a server is running, which holds the pack
+open. `serve` never does this — it only tells you to run `setup`. It is a pure offline file
+transform — no GPU, no model load, nothing downloaded — and its time is mostly disk: on the
+reference laptop's SSD, 20-30 s for speed and about 45 s for quality (the base model is
+spliced past the file cache: through it, the same 10 GB took over three minutes).
+
+To rebuild them by hand:
 
 ```powershell
-.\bin\moert-server.exe prepare                  # the release zip
-.\build-cuda\Release\moert-server.exe prepare    # a source build
+.\llapis.cmd prepare            # builds what is missing
+.\llapis.cmd prepare --force    # rebuilds everything
 ```
 
-The launcher does not run this for you. It is a pure offline file transform — no
-GPU, no model load — and its time is mostly disk: 47 s to 164 s measured for quality,
-from a fast NVMe drive to a laptop SSD.
+(It runs `moert-server.exe prepare`, from `bin\` in the release zip or `build-cuda\Release\`
+in a source build.)
 
 Quality mode cannot start without `base_neq4.gguf`: that splice *is* the quality
 runtime's base model. Speed mode does not use it at all.
@@ -238,7 +293,9 @@ prompt the cache is full, so the first answer runs at about the speed of the res
 ```
 
 Asks two things: `quality` or `speed`, and a VRAM budget. Writes one file,
-`llapis-user.json`. That is the whole configuration. Without a console to answer in
+`llapis-user.json`. That is the whole configuration. Then, if the files LLapis derives
+from the models are not there yet, it builds them (see [Models](#models)): once, a few
+minutes. Without a console to answer in
 (a script, an agent), give the two answers as flags:
 `.\llapis.cmd setup -Runtime quality -VramBudget 0` (`0` = Max, all free VRAM).
 
@@ -259,26 +316,26 @@ to change a system-wide setting.
 
 ### The commands
 
-`llapis` is the only command. Seven verbs, and none of them takes a tuning knob.
+`llapis` is the only command. Eight verbs, and none of them takes a tuning knob.
 
 | | |
 |---|---|
 | `llapis serve` | start the server + web UI on `http://127.0.0.1:8077` |
 | `llapis chat` | terminal chat against that same server (starts it if needed) |
-| `llapis setup` | choose the runtime (`quality` \| `speed`) and the VRAM budget |
+| `llapis setup` | choose the runtime (`quality` \| `speed`) and the VRAM budget; builds LLapis' own files from the models when they are missing |
 | `llapis agents` | print the provider JSON for an agent harness |
 | `llapis status` | what is the running server actually running? |
 | `llapis reset` | clear the cached conversation on the server |
 | `llapis stop` | shut the running server down |
+| `llapis prepare` | rebuild by hand the files `setup` derives from the models (`--force`) |
 
 `llapis help` prints the long version of this; `llapis` alone prints the short one.
 
-Two things people expect to find here and will not:
+Two things worth knowing:
 
-- **`prepare` is not an `llapis` verb.** It is a `moert-server` subcommand that
-  derives `models/cache/`, and you run it yourself — once, after downloading the
-  weights. Nothing invokes it for you.
-- **`quality` and `speed` are not verbs either.** They are the two runtimes, and
+- **You do not need `prepare` on a normal install**: `setup` runs it when the derived
+  files are missing. `serve` never does.
+- **`quality` and `speed` are not verbs.** They are the two runtimes, and
   `llapis setup` is where you pick one.
 
 ### The flags
@@ -486,7 +543,7 @@ models/high/      Q4_K_XL source        (you download; quality mode only)
 models/low/       IQ2 base              (you download; required)
 models/mtp/       MTP drafter           (you download; required)
 models/mmproj/    vision projector      (you download; only for -Vision)
-models/cache/     derived artifacts     (`prepare` builds them; `setup` caches the models' sizes here)
+models/cache/     derived artifacts     (`setup` builds them and caches the models' sizes here)
 logs/             one log per run       <timestamp>_<mode>.log
 llapis-user.json  your setup choice     (regenerate with `llapis setup`)
 bin/              server, DLLs, CUDA runtime   (the release zip)
@@ -581,7 +638,7 @@ To free space without losing the setup:
 
 ```powershell
 .\llapis.cmd stop
-Remove-Item -Recurse -Force .\models\cache\*      # derived artifacts, ~8 GB (speed) or ~19 GB (quality); `prepare` rebuilds them
+Remove-Item -Recurse -Force .\models\cache\*      # derived artifacts, ~8 GB (speed) or ~19 GB (quality); `llapis setup` rebuilds them
 Remove-Item -Recurse -Force .\build-cuda          # build tree (a source build only)
 Remove-Item -Recurse -Force .\logs\*
 ```
@@ -608,14 +665,26 @@ Remove-Item -Recurse -Force .\logs\*
   was removed rather than kept as a quiet exception.
 - **A first turn is slow.** The model streams from disk; steady-state speed
   arrives once the expert cache is warm.
+- **An image takes 5 to 25 seconds to read** (`-Vision`), against about a second for a text
+  prompt of the same length. Encoding the image is fast (~0.25 s); the time goes to reading
+  its tokens with the experts on the CPU, and it grows when RAM is tight.
+- **Restart Windows if it has been up for days.** LLapis runs close to the RAM limit of a
+  16 GB machine, and Windows itself holds more memory the longer it is up. With too little
+  left, answers slow down, images most of all, and in the worst case measured (about 200 MB
+  available in the middle of a 12 000-token first prompt) the model process stopped; the
+  server then reports it and can load it again. A restart, not a shutdown with Fast Startup.
 - **Every prompt pays a fixed cost before the first token**, about 0.6–1 s on the
   reference machine: the experts the prompt needs are staged into VRAM from the
   RAM copy, however short the prompt. That is most of LLapis' time to first token.
-- **If the whole model fits in your VRAM, LLapis is not the faster choice.** It is
-  built for the case where it does not fit. Measured on an RTX 3090 (24 GB) with every
-  expert resident: generation on par with tuned llama.cpp, but the prompt read at about
-  half the speed and the first token about twice as late, because the prompt still
-  takes the staged path above.
+- **If the whole model fits in your VRAM, LLapis does not buy you speed — it buys
+  you VRAM back.** It is built for the case where the model does not fit. Measured on
+  an RTX 3090 (24 GB) with every expert resident: generation on par with tuned
+  llama.cpp, but the prompt read at about half the speed and the first token about
+  twice as late, because the prompt still takes the staged path above. What LLapis can
+  do on a card that large is run at a **budget**: capped to 8 GB it still generates at
+  about 94% of its uncapped speed, and the other 16 GB stay free for everything else on
+  the machine. If you want the fastest answer and do not care about the rest of the
+  card, use llama.cpp directly there.
 - **16 GB of RAM is the floor, and LLapis keeps its 7.7 GiB expert arena in RAM
   while it runs.** The arena is the expert store mapped read-only, so it lives in
   Windows' file cache, not in LLapis' own committed memory. It asks Windows for a minimum working set of arena + 0.5 GiB,
@@ -763,8 +832,8 @@ else:
 [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt) lists every component with
 its version, licence and source.
 
-The release zip also carries, in `bin\`, the NVIDIA CUDA runtime (`cudart64_13`,
-`cublas64_13`, `cublasLt64_13`), redistributed under the
+The release zip also carries, in `bin\`, the NVIDIA CUDA runtime (`cudart64_13`),
+redistributed under the
 [NVIDIA CUDA Toolkit EULA](https://docs.nvidia.com/cuda/eula/), and the Microsoft
 Visual C++ runtime (`msvcp140`, `vcruntime140`, `vcruntime140_1`, `vcomp140`),
 redistributed under the Visual Studio redistribution terms. Those files are not

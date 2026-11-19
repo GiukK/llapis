@@ -57,6 +57,7 @@ function Invoke-LlapisChatRepl {
     $assistant = New-Object System.Text.StringBuilder
     $timings = $null
     try {
+      $wasThinking = $false
       $req = [System.Net.HttpWebRequest]::Create("$Base/v1/chat/completions")
       $req.Method = 'POST'; $req.ContentType = 'application/json'
       $req.Timeout = 600000; $req.ReadWriteTimeout = 600000
@@ -70,8 +71,10 @@ function Invoke-LlapisChatRepl {
         if ($payload -eq '[DONE]') { break }
         try { $chunk = $payload | ConvertFrom-Json } catch { continue }
         $dReason = $chunk.choices[0].delta.reasoning_content
-        if ($dReason) { Write-Host -NoNewline $dReason -ForegroundColor DarkGray }   # model thinking, dimmed
+        if ($dReason) { Write-Host -NoNewline $dReason -ForegroundColor DarkGray; $wasThinking = $true }   # model thinking, dimmed
         $delta = $chunk.choices[0].delta.content
+        # the answer starts on its own line, one blank line below the thinking it follows
+        if ($delta -and $wasThinking) { Write-Host ""; Write-Host ""; $wasThinking = $false; $delta = $delta.TrimStart() }
         if ($delta) { Write-Host -NoNewline $delta; [void]$assistant.Append($delta) }
         if ($chunk.timings) { $timings = $chunk.timings }
       }

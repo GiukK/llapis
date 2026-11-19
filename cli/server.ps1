@@ -237,11 +237,25 @@ function Invoke-LlapisServe {
   # measured on this box, boot 62 -> 71 at ctx 8192 (speed), boot 28 -> 33 (quality). Printing
   # the estimate alone made the product look like it was leaving a third of the expert cache on
   # the table when it was not. Say which number this is, and where to read the real one.
-  if ($CacheLabel) {
-      Write-Host ("Expert cache: {0}  (K{1} at boot; re-fitted to measured VRAM on the first prompt)" -f $CacheLabel, $K)
-      Write-Host "              `llapis status` reports the live value." -ForegroundColor DarkGray
+  # The VRAM line is the one setting besides the mode that a user chose (llapis setup), so it is in
+  # the header; it used to be a long [llapis] line above the banner.
+  if ($script:VramTotalMib -and $script:VramBudgetMib) {
+      Write-Host ("VRAM: up to {0} MiB of the card's {1} (llapis setup changes it)" -f $script:VramBudgetMib, $script:VramTotalMib)
+  } else {
+      Write-Host "VRAM: all that is free"
   }
-  Write-Host ("Speculative decode: {0}" -f $(if ($script:mtpCliArgs) { "MTP (n_max=$MtpNMax)" } else { 'off (single-token)' }))
+  # Expert cache size and the drafter are internals: -Verbose shows them, `llapis status` reports
+  # the live values. A drafter that is OFF is not an internal -- it halves the speed -- so that one
+  # is always said.
+  if ($VerboseMode -or $DebugMode) {
+      if ($CacheLabel) {
+          Write-Host ("Expert cache: {0}  (K{1} at boot; re-fitted to measured VRAM on the first prompt)" -f $CacheLabel, $K)
+          Write-Host "              `llapis status` reports the live value." -ForegroundColor DarkGray
+      }
+      Write-Host ("Speculative decode: {0}" -f $(if ($script:mtpCliArgs) { "MTP (n_max=$MtpNMax)" } else { 'off (single-token)' }))
+  } elseif (-not $script:mtpCliArgs) {
+      Write-Host "Speculative decode: off (-NoMtp)" -ForegroundColor Yellow
+  }
   Write-Host ""
 
   # C2: chat REUSES an already-running LLapis server on this port when its profile is
@@ -292,7 +306,7 @@ function Invoke-LlapisServe {
 
   if (-not $reusedRouter) {
     Say-Phase "Starting LLapis server (router) on http://${BindAddress}:$Port"
-    Write-Host $(if ($isChat) { "Starting server (chat backend)..." } else { "Starting server..." })
+    Write-Host $(if ($isChat) { "Loading the model for the chat (10-30 s)..." } else { "Loading the model (10-30 s)..." })
     # Start the router in the background (inherits LLAPIS_* env); normal mode redirects its output to log
     # files (the wrapper owns the terminal), -Debug keeps the console. --no-models-autoload: with autoload,
     # ANY request naming a model makes the router load it, force-killing an in-progress load (reproduced:
@@ -353,7 +367,7 @@ function Invoke-LlapisServe {
     if (-not $reusedRouter) {
       # 1) wait for the router HTTP to accept connections (/models is served even when unloaded)
       # STARTUP: 150 ms, not 500. The router needs ~2.3 s to be reachable (process
-      # start + the ggml/CUDA DLL load, cublasLt64 alone is 460 MB), and the old grain rounded
+      # start + the ggml/CUDA DLL load; cuBLAS, 460 MB of it, is no longer loaded), and the old grain rounded
       # that up to the next half-second on every launch for nothing — the probe is a loopback
       # GET against a socket that is either bound or not. Same budget in wall time (30 s).
       $up = $false
@@ -419,12 +433,11 @@ function Invoke-LlapisServe {
     } else {
       # 4) ready — the OpenAI-compatible API is the product surface
       Write-Host ""
-      Write-Host "Server ready:"
-      Write-Host ("  API : {0}/v1   (OpenAI-compatible; POST /v1/chat/completions)" -f $base)
-      Write-Host ("  UI  : {0}   (optional browser client)" -f $base)
-      Write-Host ("  Model id: {0}" -f $profName)
+      Write-Host "Server ready:" -ForegroundColor Green
+      Write-Host ("  Web UI : {0}" -f $base)
+      Write-Host ("  API    : {0}/v1   (OpenAI-compatible, model id `"{1}`")" -f $base, $profName)
       Write-Host ""
-      Write-Host "Press Ctrl+C to stop."
+      Write-Host "Ctrl+C stops it; so does 'llapis stop' from another terminal."
 
       # optional browser (secondary): -Open forces; otherwise ask once (normal interactive)
       $doOpen = [bool]$Open

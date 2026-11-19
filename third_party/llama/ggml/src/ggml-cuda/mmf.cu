@@ -126,6 +126,7 @@ void ggml_cuda_mul_mat_f(ggml_backend_cuda_context & ctx, const ggml_tensor * sr
                 ids_s0, ids_s1, ne02, nchannels_y, nchannels_dst, s02/vals_per_T, stride_channel_y, stride_channel_dst,
                 ne03, ne3, s03/vals_per_T, s13, s3, ctx.stream(), ids_info_ptr);
         } break;
+#ifndef LLAPIS_CUDA_SLIM
         case GGML_TYPE_BF16: {
             const nv_bfloat162 * src0_d = (const nv_bfloat162 *) src0->data;
             constexpr int vals_per_T = 2;
@@ -134,6 +135,7 @@ void ggml_cuda_mul_mat_f(ggml_backend_cuda_context & ctx, const ggml_tensor * sr
                 ids_s0, ids_s1, ne02, nchannels_y, nchannels_dst, s02/vals_per_T, stride_channel_y, stride_channel_dst,
                 ne03, ne3, s03/vals_per_T, s13, s3, ctx.stream(), ids_info_ptr);
         } break;
+#endif // LLAPIS_CUDA_SLIM
         default:
             GGML_ABORT("unsupported type: %s", ggml_type_name(src0->type));
     }
@@ -144,6 +146,14 @@ bool ggml_cuda_should_use_mmf(enum ggml_type type, int cc, int warp_size, const 
     if (ggml_is_quantized(type)) {
         return false;
     }
+
+#ifdef LLAPIS_CUDA_SLIM
+    // Only the instances for 1..4 columns, F32/F16 weights, plain mul_mat are compiled (mmf.cuh).
+    // Everything else is taken by llapis-gemm, which ggml_cuda_mul_mat tries next.
+    if (mul_mat_id || src1_ncols > 4 || type == GGML_TYPE_BF16) {
+        return false;
+    }
+#endif // LLAPIS_CUDA_SLIM
 
     const size_t ts = ggml_type_size(type);
     if (src0_ne[0] % (warp_size * (4/ts)) != 0) {

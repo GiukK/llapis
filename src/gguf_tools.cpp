@@ -6,6 +6,7 @@
 #include "gguf.h"
 
 #include "moert/store.h"
+#include "moert/seqio.h"
 
 #include <algorithm>
 #include <array>
@@ -147,45 +148,58 @@ int make_hybrid(const fs::path & experts_from, const fs::path & rest_from, const
     if (!gguf_write_to_file(g_out, out_path.string().c_str(), /*only_meta*/ true)) {
         std::cerr << "failed to write meta: " << out_path << "\n"; return 1;
     }
-    FILE * fout = fopen(out_path.string().c_str(), "r+b");
-    FILE * f_exp = fopen(experts_from.string().c_str(), "rb");
-    if (!fout || !f_exp) { std::cerr << "fopen failed\n"; return 1; }
-    for (auto & sh : shards) {
-        sh.f = fopen(sh.path.c_str(), "rb");
-        if (!sh.f) { std::cerr << "fopen failed: " << sh.path << "\n"; return 1; }
+    // The tensor data (10+ GB) goes through unbuffered sequential I/O (moert/seqio.h): through the file
+    // cache this splice ran at ~51 MB/s on the reference laptop (203 s), on an SSD that writes 500+.
+    int64_t base = 0;
+    {
+        FILE * fm = fopen(out_path.string().c_str(), "rb");
+        if (!fm) { std::cerr << "fopen failed: " << out_path << "\n"; return 1; }
+        io::seek64(fm, 0, SEEK_END);
+        base = io::tell64(fm);
+        fclose(fm);
     }
-    io::seek64(fout, 0, SEEK_END);
-    const int64_t base = io::tell64(fout);
+    moert_seqio::Writer fout;
+    moert_seqio::Reader f_exp;
+    std::vector<moert_seqio::Reader> f_rest(shards.size());
+    if (!fout.open(out_path.string().c_str(), (uint64_t) base) || !f_exp.open(experts_from.string().c_str())) {
+        std::cerr << "open failed: " << out_path << " / " << experts_from << "\n"; return 1;
+    }
+    for (size_t si = 0; si < shards.size(); ++si) {
+        if (!f_rest[si].open(shards[si].path.c_str())) { std::cerr << "open failed: " << shards[si].path << "\n"; return 1; }
+    }
 
     std::vector<char> buf(8u * 1024 * 1024);
     int64_t written = 0;
     for (int64_t i = 0; i < (int64_t) order.size(); ++i) {
         const Ent & e = order[i];
         gguf_context * sg = e.exp ? g_exp : shards[e.shard].g;
-        FILE * sf         = e.exp ? f_exp : shards[e.shard].f;
+        moert_seqio::Reader & sf = e.exp ? f_exp : f_rest[e.shard];
         const int64_t sid = gguf_find_tensor(sg, e.name.c_str());
         const int64_t src_pos = (int64_t) gguf_get_data_offset(sg) + (int64_t) gguf_get_tensor_offset(sg, sid);
         const int64_t dst_pos = base + (int64_t) gguf_get_tensor_offset(g_out, i);
         const size_t  sz_out  = gguf_get_tensor_size(g_out, i);
         const size_t  sz_src  = gguf_get_tensor_size(sg, sid);
         if (sz_out != sz_src) { std::cerr << "size mismatch for " << e.name << ": " << sz_out << " vs " << sz_src << "\n"; return 1; }
-        io::seek64(fout, dst_pos, SEEK_SET);
-        io::seek64(sf, src_pos, SEEK_SET);
+        // tensors are written in output order, so dst_pos only grows: a gap is GGUF alignment padding
+        if ((uint64_t) dst_pos < fout.pos() || !fout.pad_to((uint64_t) dst_pos)) {
+            std::cerr << "out-of-order tensor offset for " << e.name << "\n"; return 1;
+        }
         size_t remaining = sz_src;
+        uint64_t src = (uint64_t) src_pos;
         while (remaining > 0) {
             const size_t chunk = std::min(remaining, buf.size());
-            if (fread(buf.data(), 1, chunk, sf) != chunk) { std::cerr << "read short on " << e.name << "\n"; return 1; }
-            if (fwrite(buf.data(), 1, chunk, fout) != chunk) { std::cerr << "write short on " << e.name << "\n"; return 1; }
-            remaining -= chunk;
+            if (!sf.read(src, buf.data(), chunk)) { std::cerr << "read short on " << e.name << "\n"; return 1; }
+            if (!fout.write(buf.data(), chunk)) { std::cerr << "write short on " << e.name << "\n"; return 1; }
+            remaining -= chunk; src += chunk;
         }
         written += (int64_t) sz_src;
     }
     // Finalize the output file with an explicit error check: a silent short flush
     // here would corrupt a multi-GB model that otherwise "looks" written.
-    bool ok = (ferror(fout) == 0);
-    if (fclose(fout) != 0) ok = false;
-    fclose(f_exp);
-    for (auto & sh : shards) { if (sh.f) fclose(sh.f); gguf_free(sh.g); ggml_free(sh.gc); }
+    bool ok = fout.close();
+    f_exp.close();
+    for (auto & r : f_rest) r.close();
+    for (auto & sh : shards) { gguf_free(sh.g); ggml_free(sh.gc); }
     gguf_free(g_out); gguf_free(g_exp);
     ggml_free(gc_out); ggml_free(gc_exp);
     if (!ok) { std::cerr << "error finalizing " << out_path << "\n"; return 1; }
@@ -371,6 +385,11 @@ int make_expert_store(const fs::path & src_path, const fs::path & out_index, con
         gguf_free(g); ggml_free(gc);
         return 1;
     }
+    // The store stays on buffered stdio, unlike the splice above (moert/seqio.h): measured, alternating,
+    // 14-21 s buffered vs 22-29 s unbuffered with 4 writes in flight. The unbuffered number is the
+    // drive's sustained write (~300 MB/s here); the buffered one returns with part of the pack still
+    // dirty in the file cache -- which is where `serve` wants the pack next anyway (the arena is held
+    // in RAM). The splice is the opposite case: 10+ GB through the cache thrashed it (203 s vs ~30 s).
     std::vector<char> buf;
     uint64_t written = 0;
     long long pages = 0;

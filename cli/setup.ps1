@@ -223,6 +223,7 @@ function Assert-LlapisModels([hashtable]$mm, [string]$wantMode) {
     Write-Host ("       {0}" -f $mm.LowWhy) -ForegroundColor Red
     Write-Host ("       Put its GGUF here (e.g. IQ2_M on an 8 GB card, Q4 on a bigger one):  {0}" -f $script:DirLow) -ForegroundColor Red
     Write-Host "       Both modes need it: speed runs it directly, quality derives its base and expert arena from it." -ForegroundColor Red
+    Write-Host "       First install? README.md, section 'Models', has the download commands; then: llapis setup" -ForegroundColor Red
     Write-Host ""
     Stop-Launcher 1
   }
@@ -333,6 +334,17 @@ function Select-LlapisVram([int]$current, [int]$floor = 0) {
     Write-Host ""
     if ($total) { Write-Host ("  This GPU has {0} MiB ({1:N1} GiB) total." -f $total, ($total / 1024)) -ForegroundColor DarkGray }
     else        { Write-Host "  (nvidia-smi unavailable — a custom value will be taken on trust.)" -ForegroundColor DarkGray }
+    # On a card where the whole model fits, LLapis has no speed to offer and the honest advice is to
+    # say so here, where the choice is made, not only in the README's limits. 16 GiB is the trigger:
+    # the IQ2 expert file is ~9.3 GiB and a full-context KV plus the compute reserve is ~2 GiB more.
+    # The 94% is measured (RTX 3090, 24 GB: 136.1 tok/s uncapped against 127.6 capped to 8000 MiB).
+    if ($total -ge 16384) {
+      Write-Host ""
+      Write-Host "  On a card this size the whole model may fit in VRAM. LLapis is not what makes it" -ForegroundColor DarkGray
+      Write-Host "  fast there — llama.cpp on its own generates just as quickly. What a limit buys you" -ForegroundColor DarkGray
+      Write-Host "  is the rest of the card: capped to 8 GiB, generation was measured at ~94% of" -ForegroundColor DarkGray
+      Write-Host "  uncapped, with the other 16 GiB free for everything else on the machine." -ForegroundColor DarkGray
+    }
     if ($floor -gt 0) {
       Write-Host ("  The installed models need ~{0} MiB at the smallest expert cache." -f $floor) -ForegroundColor DarkGray
       if ($total -and $floor -gt $total) {
@@ -381,6 +393,71 @@ function Select-LlapisVram([int]$current, [int]$floor = 0) {
 # `setup`: CHECK -> CHOICE -> ALERT/FATAL/GO. No model paths, no context, no K.
 # `llapis setup -Runtime quality|speed [-VramBudget <MiB>]`: the same two answers as the wizard, given as
 # flags -- for a script, an agent, or any shell without a console to answer in. Same model checks, same file.
+# The derived files (models\cache: the expert store, and quality's base model) are built HERE, by
+# setup, the first time and whenever one is missing. `prepare` used to be a separate step the user had
+# to know about: between "setup" and "serve" on a fresh install, and again after adding the high model.
+# Setup is the right moment -- the user is present, the models were just checked, and nothing is
+# running -- and `serve` is not: it must start in seconds and never write gigabytes unasked.
+# `llapis prepare` stays as the manual tool (`--force` rebuilds). Returns $true when serve can start.
+function Invoke-LlapisPrepareIfNeeded([string]$mode, $mm) {
+  $cache = Join-Path $Root 'models\cache'
+  $needPack = -not (Test-Path (Join-Path $cache 'low.experts.pack'))
+  # prepare builds the base whenever the high model is there, so that is what is about to be written
+  $needBase = [bool]$mm.High -and -not (Test-Path (Join-Path $cache 'base_neq4.gguf'))
+  if (-not ($needPack -or $needBase)) {
+    Write-Host "You can now run:  .\llapis.cmd serve -Open   (web UI)   |   .\llapis.cmd chat   (terminal)"
+    return $true
+  }
+
+  $what = @(); if ($needPack) { $what += 'the expert store' }; if ($needBase) { $what += "quality's base model" }
+  $lowLen = [double](Get-Item $mm.Low).Length
+  # measured against the reference files: the pack is 0.84x the low model, the base 1.11x; the drafter head ~0.5 GiB
+  $needBytes = 0.6GB; if ($needPack) { $needBytes += 0.86 * $lowLen }; if ($needBase) { $needBytes += 1.12 * $lowLen }
+  $needGb = [Math]::Round($needBytes / 1e9)
+
+  Write-Host ""
+  Write-Host ("LLapis now builds its own files from the models: {0}." -f ($what -join ' and ')) -ForegroundColor Cyan
+  Write-Host ("Once, about {0} GB in models\cache, {1}. Nothing is downloaded and the GPU is not used." -f $needGb, $(if ($needBase) { 'about a minute' } else { 'well under a minute' }))
+
+  if (@(Get-Process -Name 'moert-server' -ErrorAction SilentlyContinue).Count) {
+    Write-Host ""
+    Write-Host "A LLapis server is running and holds those files open. Stop it, then run setup again:" -ForegroundColor Yellow
+    Write-Host "  .\llapis.cmd stop"
+    Write-Host "  .\llapis.cmd setup"
+    return $false
+  }
+  try {
+    New-Item -ItemType Directory -Force -Path $cache | Out-Null
+    $free = [double](Get-PSDrive -Name ((Get-Item $cache).PSDrive.Name) -ErrorAction Stop).Free
+    if ($free -lt $needBytes + 1GB) {
+      Write-Host ""
+      Write-Host ("Not enough free disk: {0:N0} GB free on {1}:, about {2} GB needed." -f ($free / 1e9), (Get-Item $cache).PSDrive.Name, ($needGb + 1)) -ForegroundColor Red
+      Write-Host "Free some space, then run  .\llapis.cmd setup  again (your choices are saved)."
+      return $false
+    }
+  } catch { }   # an unreadable drive is not a reason to refuse: prepare itself reports a full disk
+
+  if (-not (Test-Path $SrvExe)) { Write-Host "the server binary was not found: $SrvExe" -ForegroundColor Red; return $false }
+  Write-Host ""
+  $t0 = Get-Date
+  Push-Location $Root
+  try {
+    # prepare's own progress, indented; its last line is a JSON summary for scripts
+    & $SrvExe prepare 2>&1 | ForEach-Object { $l = "$_"; if ($l -and -not $l.StartsWith('{')) { Write-Host "  $l" -ForegroundColor DarkGray } }
+    $rc = $LASTEXITCODE
+  } finally { Pop-Location }
+  if ($rc -ne 0) {
+    Write-Host ""
+    Write-Host "Building the files failed (exit $rc); the lines above say why." -ForegroundColor Red
+    Write-Host "Your choices are saved. Fix that, then run  .\llapis.cmd setup  again."
+    return $false
+  }
+  Write-Host ""
+  Write-Host ("Done in {0:N0} s." -f ((Get-Date) - $t0).TotalSeconds) -ForegroundColor Green
+  Write-Host "You can now run:  .\llapis.cmd serve -Open   (web UI)   |   .\llapis.cmd chat   (terminal)"
+  return $true
+}
+
 function Invoke-LlapisSetupFromFlags([string]$mode, [int]$vramBudgetMib) {
   $mm = Resolve-LlapisModels
   Show-LlapisModelCheck $mm
@@ -390,8 +467,8 @@ function Invoke-LlapisSetupFromFlags([string]$mode, [int]$vramBudgetMib) {
   [void](Write-LlapisSetup $mode $vramBudgetMib)
   Write-Host ""
   Write-Host ("Saved: runtime {0}, VRAM {1}." -f $mode, $(if ($vramBudgetMib -gt 0) { "up to $vramBudgetMib MiB" } else { 'Max (all free VRAM)' }))
-  Write-Host "You can now run:  .\llapis.cmd chat   |   .\llapis.cmd serve"
-  return $true
+  # a script needs to know: exit 1 when the derived files could not be built (launcher.ps1)
+  return (Invoke-LlapisPrepareIfNeeded $mode $mm)
 }
 
 function Invoke-LlapisWizard {
@@ -399,7 +476,7 @@ function Invoke-LlapisWizard {
   Write-Host "LLapis Setup"
   Write-Host ""
   Write-Host "Models are read from fixed folders — there is nothing to browse for."
-  Write-Host "The only choice is which runtime to use."
+  Write-Host "Two choices: which runtime to use, and how much VRAM it may take."
 
   $mm = Resolve-LlapisModels
   Show-LlapisModelCheck $mm
@@ -452,6 +529,6 @@ function Invoke-LlapisWizard {
 
   Write-Host ""
   Write-Host "Saved."
-  Write-Host "You can now run:  .\llapis.cmd chat   |   .\llapis.cmd serve"
+  [void](Invoke-LlapisPrepareIfNeeded $mode $mm)
   return $s
 }
