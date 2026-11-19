@@ -1,6 +1,16 @@
 #include "llapis-gemm.cuh"
 #include "convert.cuh"
 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 #include <algorithm>
 #include <climits>
 #include <cstdio>
@@ -265,4 +275,18 @@ bool llapis_gemm_mul_mat(ggml_backend_cuda_context & ctx, const ggml_tensor * sr
     t0.nb[2] = t0.nb[1] * t0.ne[1];
     t0.nb[3] = t0.nb[2] * t0.ne[2];
     return llapis_gemm_src1(ctx, (const float *) src0_f32.get(), &t0, src1, dst);
+}
+
+// See common.cuh: called once, when the first cuBLAS handle is created.
+void llapis_require_cublas() {
+#ifdef _WIN32
+    char name[32];
+    snprintf(name, sizeof(name), "cublas64_%d.dll", CUDART_VERSION / 1000);
+    if (LoadLibraryA(name) == nullptr) {
+        GGML_ABORT("LLapis: an operation needs cuBLAS (%s), which the release does not ship: no LLapis "
+                   "kernel took this matrix product. Please report it with this log. Workaround: copy "
+                   "cublas64 and cublasLt64 from a CUDA %d Toolkit (bin\\x64) next to ggml-cuda.dll.",
+                   name, CUDART_VERSION / 1000);
+    }
+#endif
 }
